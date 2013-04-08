@@ -1,0 +1,71 @@
+'''
+Created on Apr 3, 2013
+
+@author: tristan
+'''
+
+import pycuda.driver as cuda
+import pycuda.gpuarray as gpuarray
+from dataTransfer import *
+from gpuHelper import *
+import spacialDiscretization
+from mesh.spacialDiscretization import spacialModule
+from modelChecker import *
+
+printGPUMemUsage()
+
+# Build test mesh
+m = 32  # number of rows
+n = 32  # number of columns
+freeSurface = 1.5
+cellWidth = 1.0
+cellHeight = 1.0
+
+# Calculate GPU grid/block sizes
+blockDim = 16
+gridM = m / blockDim + (1 if (m % blockDim != 0) else 0)
+gridN = n / blockDim + (1 if (n % blockDim != 0) else 0)
+
+meshBottomIntPts = np.zeros((m + 1, n + 1, 2))
+for i in range(m + 1):
+    for j in range(n + 1):
+        if j < n / 2:
+            if j == n / 2 - 1:
+                meshBottomIntPts[i][j][0] = j - 5.0
+                meshBottomIntPts[i][j][1] = j - 5.0
+            else:
+                meshBottomIntPts[i][j][0] = j + 0.5 - 5.0
+                meshBottomIntPts[i][j][1] = j - 5.0
+        else:
+            meshBottomIntPts[i][j][0] = n - j - 1 - 0.5 - 5.0
+            meshBottomIntPts[i][j][1] = n - j - 1 - 5.0
+
+meshU = np.zeros((m, n, 3))
+for i in range(m):
+    for j in range(n):
+        if meshBottomIntPts[i][j][0] <= 0.0:
+            meshU[i][j][0] = 0.0
+        else:
+            meshU[i][j][0] = meshBottomIntPts[i][j][0]
+
+
+meshUGPU = sendToGPU(meshU)
+meshUIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)  # Empty U for in-cell integration points
+meshBottomIntPtsGPU = sendToGPU(meshBottomIntPts)  # gpuarray.zeros((m + 1, n + 1, 2), np.float32)  # Flat bottom with zero elevation
+
+printGPUMemUsage()
+reconstructFreeSurface = spacialModule.get_function("reconstructFreeSurface")
+preservePositivity = spacialModule.get_function("preservePositivity")
+freeSurfaceTime = reconstructFreeSurface(meshUGPU, meshUIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
+positivityTime = preservePositivity(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
+
+meshUIntPts = meshUIntPtsGPU.get()
+
+print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
+print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
+# direction = 2
+# printCellCenteredMatrix(meshU, m, n, 'meshU')
+# print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
+# print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
+
+
