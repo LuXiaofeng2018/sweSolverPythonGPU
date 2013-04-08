@@ -165,6 +165,34 @@ spacialModule = SourceModule("""
     }
     
     
+    __global__ void calculatePropagationSpeeds(float *propSpeeds, float *huvIntPts, int m, int n)
+    {
+        int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
+        int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
+        int northIndex = row*n*4*3 + col*4*3 + 0*3;
+        int southIndex = (row+1)*n*4*3 + col*4*3 + 1*3;
+        int eastIndex = row*n*4*3 + col*4*3 + 2*3;
+        int westIndex = row*n*4*3 + (col+1)*4*3 + 3*3;
+        
+        float g = 9.81f;
+        
+        if (col < n-1 && row < m-1)
+        {
+            // North propagation speed of this cell
+            propSpeeds[row*n*4 + col*4 + 0] = fminf(fminf(huvIntPts[northIndex+2] - sqrtf(g * huvIntPts[northIndex]), huvIntPts[southIndex+2] - sqrtf(g * huvIntPts[southIndex])), 0.0f);
+            
+            // South propagation speed of the cell above this one
+            propSpeeds[(row+1)*n*4 + col*4 + 1] = fmaxf(fmaxf(huvIntPts[northIndex+2] + sqrtf(g * huvIntPts[northIndex]), huvIntPts[southIndex+2] + sqrtf(g * huvIntPts[southIndex])), 0.0f);
+            
+            // East propagation speed of this cell
+            propSpeeds[row*n*4 + col*4 + 2] = fminf(fminf(huvIntPts[eastIndex+1] - sqrtf(g * huvIntPts[eastIndex]), huvIntPts[westIndex+1] - sqrtf(g * huvIntPts[westIndex])), 0.0f);
+            
+            // West propagation speed of the cell to the right of this one
+            propSpeeds[row*n*4 + (col+1)*4 + 3] = fmaxf(fmaxf(huvIntPts[eastIndex+1] + sqrtf(g * huvIntPts[eastIndex]), huvIntPts[westIndex+1] + sqrtf(g * huvIntPts[westIndex])), 0.0f);
+        }
+    }
+    
+    
     
     
     // This kernel doesn't work yet, don't use it
