@@ -14,8 +14,8 @@ from modelChecker import *
 printGPUMemUsage()
 
 # Build test mesh
-m = 32  # number of rows
-n = 32  # number of columns
+m = 64  # number of rows
+n = 64  # number of columns
 freeSurface = 1.5
 cellWidth = 1.0
 cellHeight = 1.0
