@@ -97,22 +97,38 @@ spacialModule = SourceModule("""
     }
     
     
-    __global__ void calculateHUV(float *huvIntPts, float *meshUIntPts, int m, int n)
+    __global__ void calculateHUV(float *huvIntPts, float *meshUIntPts, float *meshBottomIntPts, int m, int n, float dx, float dy)
     {
         int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
         int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
-        int cellIndex = row*n*2 + col*2;
+        int cellIndex = row*(n+1)*2 + col*2;
         int northIndex = row*n*4*3 + col*4*3 + 0*3;
         int southIndex = row*n*4*3 + col*4*3 + 1*3;
         int eastIndex = row*n*4*3 + col*4*3 + 2*3;
         int westIndex = row*n*4*3 + col*4*3 + 3*3;
         
+        float Kappa = 0.01f * fmaxf(1.0f, fminf(dx, dy));
+        float sqrt2 = sqrtf(2.0f);
+        
         if (col < n-1 && row < m-1)
         {
-            for (int i=0; i<4; i++)
-            {
-                
-            }
+            // Calculate h at the four integration points
+            huvIntPts[northIndex] = meshUIntPts[northIndex] - meshBottomIntPts[cellIndex + (n+1)*2];
+            huvIntPts[southIndex] = meshUIntPts[southIndex] - meshBottomIntPts[cellIndex];
+            huvIntPts[eastIndex] = meshUIntPts[eastIndex] - meshBottomIntPts[cellIndex+3];
+            huvIntPts[westIndex] = meshUIntPts[westIndex] - meshBottomIntPts[cellIndex+1];
+            
+            // Calculate u at the four integration points
+            huvIntPts[northIndex + 1] = (sqrt2 * huvIntPts[northIndex] * meshUIntPts[northIndex + 1]) / sqrtf(powf(huvIntPts[northIndex], 4.0f) + fmaxf(powf(huvIntPts[northIndex], 4.0f), Kappa));
+            huvIntPts[southIndex + 1] = (sqrt2 * huvIntPts[southIndex] * meshUIntPts[southIndex + 1]) / sqrtf(powf(huvIntPts[southIndex], 4.0f) + fmaxf(powf(huvIntPts[southIndex], 4.0f), Kappa));
+            huvIntPts[eastIndex + 1] = (sqrt2 * huvIntPts[eastIndex] * meshUIntPts[eastIndex + 1]) / sqrtf(powf(huvIntPts[eastIndex], 4.0f) + fmaxf(powf(huvIntPts[eastIndex], 4.0f), Kappa));
+            huvIntPts[westIndex + 1] = (sqrt2 * huvIntPts[westIndex] * meshUIntPts[westIndex + 1]) / sqrtf(powf(huvIntPts[westIndex], 4.0f) + fmaxf(powf(huvIntPts[westIndex], 4.0f), Kappa));
+            
+            // Calculate v at the four integration points
+            huvIntPts[northIndex + 2] = (sqrt2 * huvIntPts[northIndex] * meshUIntPts[northIndex + 2]) / sqrtf(powf(huvIntPts[northIndex], 4.0f) + fmaxf(powf(huvIntPts[northIndex], 4.0f), Kappa));
+            huvIntPts[southIndex + 2] = (sqrt2 * huvIntPts[southIndex] * meshUIntPts[southIndex + 2]) / sqrtf(powf(huvIntPts[southIndex], 4.0f) + fmaxf(powf(huvIntPts[southIndex], 4.0f), Kappa));
+            huvIntPts[eastIndex + 2] = (sqrt2 * huvIntPts[eastIndex] * meshUIntPts[eastIndex + 2]) / sqrtf(powf(huvIntPts[eastIndex], 4.0f) + fmaxf(powf(huvIntPts[eastIndex], 4.0f), Kappa));
+            huvIntPts[westIndex + 2] = (sqrt2 * huvIntPts[westIndex] * meshUIntPts[westIndex + 2]) / sqrtf(powf(huvIntPts[westIndex], 4.0f) + fmaxf(powf(huvIntPts[westIndex], 4.0f), Kappa));
         }
     }
     
