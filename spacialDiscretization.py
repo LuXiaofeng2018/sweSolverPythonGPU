@@ -133,9 +133,41 @@ spacialModule = SourceModule("""
     }
     
     
+    // Shared memory would be really easy in this kernel
+    __global__ void updateUIntPts(float *huvIntPts, float *meshUIntPts, int m, int n)
+    {
+        int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
+        int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
+        int northIndex = row*n*4*3 + col*4*3 + 0*3;
+        int southIndex = row*n*4*3 + col*4*3 + 1*3;
+        int eastIndex = row*n*4*3 + col*4*3 + 2*3;
+        int westIndex = row*n*4*3 + col*4*3 + 3*3;
+        
+        if (col < n-1 && row < m-1)
+        {
+            // Update hu and hv North
+            meshUIntPts[northIndex+1] = huvIntPts[northIndex] * huvIntPts[northIndex+1];
+            meshUIntPts[northIndex+2] = huvIntPts[northIndex] * huvIntPts[northIndex+2];
+            
+            // Update hu and hv South
+            meshUIntPts[southIndex+1] = huvIntPts[southIndex] * huvIntPts[southIndex+1];
+            meshUIntPts[southIndex+2] = huvIntPts[southIndex] * huvIntPts[southIndex+2];
+            
+            // Update hu and hv East
+            meshUIntPts[eastIndex+1] = huvIntPts[eastIndex] * huvIntPts[eastIndex+1];
+            meshUIntPts[eastIndex+2] = huvIntPts[eastIndex] * huvIntPts[eastIndex+2];
+            
+            // Update hu and hv West
+            meshUIntPts[westIndex+1] = huvIntPts[westIndex] * huvIntPts[westIndex+1];
+            meshUIntPts[westIndex+2] = huvIntPts[westIndex] * huvIntPts[westIndex+2];
+        }
+         
+    }
     
     
     
+    
+    // This kernel doesn't work yet, don't use it
     __global__ void rFSshared(float *meshU, float *meshUIntPts, int m, int n, float cellWidth, float cellHeight)
     {
         extern __shared__ float blockU[];

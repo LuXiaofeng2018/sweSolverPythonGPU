@@ -54,12 +54,18 @@ meshBottomIntPtsGPU = sendToGPU(meshBottomIntPts)  # gpuarray.zeros((m + 1, n + 
 meshHUVIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)
 
 printGPUMemUsage()
+
+# Get function handles from GPU module
 reconstructFreeSurface = spacialModule.get_function("reconstructFreeSurface")
 preservePositivity = spacialModule.get_function("preservePositivity")
 calculateHUV = spacialModule.get_function("calculateHUV")
+updateUIntPts = spacialModule.get_function("updateUIntPts")
+
+
 freeSurfaceTime = reconstructFreeSurface(meshUGPU, meshUIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 positivityTime = preservePositivity(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 huvTime = calculateHUV(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
+updateUTime = updateUIntPts(meshHUVIntPtsGPU, meshUIntPtsGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 
 meshUIntPts = meshUIntPtsGPU.get()
 huvIntPts = meshHUVIntPtsGPU.get()
@@ -67,10 +73,11 @@ huvIntPts = meshHUVIntPtsGPU.get()
 print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
 print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
 print "Time to calculate huv:\t\t\t" + str(huvTime) + " sec"
+print "Time to update U at integration points:\t" + str(updateUTime) + " sec"
 
 direction = 3
 # printCellCenteredMatrix(meshU, m, n, 'meshU')
 # print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
-# print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
-print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
+print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
+# print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
 
