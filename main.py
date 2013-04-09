@@ -11,6 +11,7 @@ from gpuHelper import *
 from spacialDiscretization import *
 from fluxCalculations import *
 from sourceCalculations import *
+from timestepper import *
 from modelChecker import *
 
 printGPUMemUsage()
