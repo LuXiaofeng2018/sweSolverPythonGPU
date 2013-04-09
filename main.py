@@ -86,11 +86,11 @@ print "Time to calculate propagation speeds:\t" + str(propSpeedTime) + " sec"
 print "Time to calculate fluxes:\t\t" + str(fluxTime) + " sec"
 print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime)
 
-direction = 0
+direction = 2
 # printCellCenteredMatrix(meshU, m, n, 'meshU')
 # print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
 # print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
 # print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
-# print4DirectionCellMatrix(propSpeeds, m, n, direction, "propSpeeds")
-print4DirectionCellMatrix(fluxes, m, n, direction, "fluxes", 0)
+# print4DirectionCellMatrix(propSpeeds, m, n, 2, "propSpeeds")
+print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
 
