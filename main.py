@@ -10,6 +10,7 @@ from dataTransfer import *
 from gpuHelper import *
 from spacialDiscretization import *
 from fluxCalculations import *
+from sourceCalculations import *
 from modelChecker import *
 
 printGPUMemUsage()
@@ -55,6 +56,7 @@ meshBottomIntPtsGPU = sendToGPU(meshBottomIntPts)  # gpuarray.zeros((m + 1, n + 
 meshHUVIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)
 meshPropSpeedsGPU = gpuarray.zeros((m, n, 4), np.float32)
 meshFluxesGPU = gpuarray.zeros((m, n, 2, 3), np.float32)
+meshSlopeSourceGPU = gpuarray.zeros((m, n, 2), np.float32)
 
 printGPUMemUsage()
 
@@ -65,6 +67,7 @@ calculateHUV = spacialModule.get_function("calculateHUV")
 updateUIntPts = spacialModule.get_function("updateUIntPts")
 calculatePropagationSpeeds = spacialModule.get_function("calculatePropagationSpeeds")
 fluxSolver = fluxModule.get_function("fluxSolver")
+bedSlopeSourceSolver = sourceModule.get_function("bedSlopeSourceSolver")
 
 freeSurfaceTime = reconstructFreeSurface(meshUGPU, meshUIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 positivityTime = preservePositivity(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
@@ -72,11 +75,13 @@ huvTime = calculateHUV(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, np
 updateUTime = updateUIntPts(meshHUVIntPtsGPU, meshUIntPtsGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 propSpeedTime = calculatePropagationSpeeds(meshPropSpeedsGPU, meshHUVIntPtsGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 fluxTime = fluxSolver(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
+slopeSourceTime = bedSlopeSourceSolver(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 
-meshUIntPts = meshUIntPtsGPU.get()
-huvIntPts = meshHUVIntPtsGPU.get()
-propSpeeds = meshPropSpeedsGPU.get()
-fluxes = meshFluxesGPU.get()
+# meshUIntPts = meshUIntPtsGPU.get()
+# huvIntPts = meshHUVIntPtsGPU.get()
+# propSpeeds = meshPropSpeedsGPU.get()
+# fluxes = meshFluxesGPU.get()
+slopeSource = meshSlopeSourceGPU.get()
 
 print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
 print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
@@ -88,9 +93,10 @@ print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updat
 
 direction = 2
 # printCellCenteredMatrix(meshU, m, n, 'meshU')
-# print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
+print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
 # print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
 # print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
 # print4DirectionCellMatrix(propSpeeds, m, n, 2, "propSpeeds")
-print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
+# print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
+print3DMatrix(slopeSource, m, n, 0, "slopeSource")
 

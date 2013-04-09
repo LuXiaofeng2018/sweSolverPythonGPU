@@ -14,6 +14,16 @@ def printCellCenteredMatrix(matrix, m, n, matrixName):
             line += str(matrix[i][j][0]) + "\t"
         print line
 
+def print3DMatrix(matrix, m, n, index, matrixName=""):
+
+    print str(index) + " value of " + matrixName + ":"
+    for i in range(m):
+        line = ''
+        for j in range(n):
+            line += str(matrix[i][j][index]) + "\t"
+        print line
+
+
 def print2DirectionInterfaceMatrix(matrix, m, n, direction, matrixName, index= -1):
 
     print getDirectionText(direction) + " value of " + matrixName + ":"
