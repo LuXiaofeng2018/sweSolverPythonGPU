@@ -16,8 +16,8 @@ from modelChecker import *
 printGPUMemUsage()
 
 # Build test mesh
-m = 16  # number of rows
-n = 16  # number of columns
+m = 64  # number of rows
+n = 64  # number of columns
 freeSurface = 1.5
 cellWidth = 1.0
 cellHeight = 1.0
@@ -89,14 +89,15 @@ print "Time to calculate huv:\t\t\t" + str(huvTime) + " sec"
 print "Time to update U at integration points:\t" + str(updateUTime) + " sec"
 print "Time to calculate propagation speeds:\t" + str(propSpeedTime) + " sec"
 print "Time to calculate fluxes:\t\t" + str(fluxTime) + " sec"
-print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime)
+print "Time to calculate slope source:\t\t" + str(slopeSourceTime) + " sec"
+print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime)
 
 direction = 2
 # printCellCenteredMatrix(meshU, m, n, 'meshU')
-print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
+# print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
 # print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
 # print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
 # print4DirectionCellMatrix(propSpeeds, m, n, 2, "propSpeeds")
 # print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
-print3DMatrix(slopeSource, m, n, 0, "slopeSource")
+# print3DMatrix(slopeSource, m, n, 0, "slopeSource")
 
