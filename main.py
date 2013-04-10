@@ -73,6 +73,8 @@ fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m
 slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+timestep = calculateTimestep(meshPropSpeedsGPU, cellWidth)
+print "Timestep: " + str(timestep)
 
 # meshUIntPts = meshUIntPtsGPU.get()
 # huvIntPts = meshHUVIntPtsGPU.get()
@@ -81,6 +83,7 @@ buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU
 slopeSource = meshSlopeSourceGPU.get()
 # shearSource = meshShearSourceGPU.get()
 RValues = meshRValuesGPU.get()
+
 
 print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
 print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
@@ -100,7 +103,7 @@ direction = 2
 # print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
 # print4DirectionCellMatrix(propSpeeds, m, n, 2, "propSpeeds")
 # print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
-print3DMatrix(slopeSource, m, n, 0, "slopeSource")
+# print3DMatrix(slopeSource, m, n, 0, "slopeSource")
 # printCellCenteredMatrix(shearSource, m, n, "shearSource")
-printCellCenteredMatrix(RValues, m, n, "RValues", 1)
+# printCellCenteredMatrix(RValues, m, n, "RValues", 1)
 
