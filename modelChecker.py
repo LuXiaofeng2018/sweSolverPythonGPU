@@ -5,14 +5,21 @@ Created on Apr 7, 2013
 '''
 
 
-def printCellCenteredMatrix(matrix, m, n, matrixName):
+def printCellCenteredMatrix(matrix, m, n, matrixName, index= -1):
 
     print "Cell centered values of " + matrixName + ":"
-    for i in range(m):
-        line = ''
-        for j in range(n):
-            line += str(matrix[i][j][0]) + "\t"
-        print line
+    if index != -1:
+        for i in range(m):
+            line = ''
+            for j in range(n):
+                line += str(matrix[i][j][0]) + "\t"
+            print line
+    else:
+        for i in range(m):
+            line = ''
+            for j in range(n):
+                line += str(matrix[i][j]) + "\t"
+            print line
 
 def print3DMatrix(matrix, m, n, index, matrixName=""):
 

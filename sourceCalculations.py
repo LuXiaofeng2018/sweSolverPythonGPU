@@ -24,10 +24,38 @@ sourceModule = SourceModule("""
             float hX = ((meshUIntPts[uCellIndex + 2*3] - meshBottomIntPts[bottomCellIndex+3]) + (meshUIntPts[uCellIndex + 3*3] - meshBottomIntPts[bottomCellIndex+1])) / 2.0f;    // h at cell center
             float hY = ((meshUIntPts[uCellIndex] - meshBottomIntPts[bottomCellIndex + (n+1)*2]) + (meshUIntPts[uCellIndex + 1*3] - meshBottomIntPts[bottomCellIndex])) / 2.0f;    // h at cell center
             float slopeX = (meshBottomIntPts[bottomCellIndex+3] - meshBottomIntPts[bottomCellIndex+1]) / dx;        // slope in x-dir
-            float slopeY = (meshBottomIntPts[bottomCellIndex + (n+1)*2] - meshBottomIntPts[bottomCellIndex]) / dy;    // slope in y-dire
+            float slopeY = (meshBottomIntPts[bottomCellIndex + (n+1)*2] - meshBottomIntPts[bottomCellIndex]) / dy;    // slope in y-dir
             meshBedSlope[slopeCellIndex] =  -9.81f * slopeX * hX; // slope source in x-dir
             meshBedSlope[slopeCellIndex+1] = -9.81f * slopeY * hY; // slope source in y-dir
         }
-    } 
+    }
+    
+    // Bed shear is a 2-D array of values, one value for each cell because the 0-index is always 0.0, and the 1- and 2-index are equivalent
+    __global__ void bedShearSourceSolver(float *meshBedShear, float *meshU, float *meshBottomIntPts, int m, int n, float dx, float dy)
+    {
+        float manningsN = 0.03;
+        float sqrt2 = sqrtf(2.0f);
+        float Kappa = 0.01f * fmaxf(1.0f, fminf(dx, dy));
+        
+        int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
+        int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
+        
+        if (col < n-1 && row < m-1)
+        {
+            float h = meshU[row*n*3 + col*3] - (meshBottomIntPts[row*(n+1)*2 + (col+1)*2 + 1] + meshBottomIntPts[row*(n+1)*2 + col*2 + 1]) / 2.0f;
+            if (h > 0.0f)
+            {
+                float denom = sqrtf(powf(h, 2.0f) + fmaxf(powf(h, 4.0f), Kappa));
+                float u = (sqrt2 * h * meshU[row*n*3 + col*3 + 1]) / denom;
+                float v = (sqrt2 * h * meshU[row*n*3 + col*3 + 2]) / denom;
+                float Cz = powf(h, 1.0f/6.0f) / manningsN;
+                float solution = (-9.81f * sqrtf(powf(u, 2.0f) + powf(v, 2.0f))) / (h * powf(Cz, 2.0f));
+                meshBedShear[row*n + col] = solution;
+            } else {
+                meshBedShear[row*n + col] = 0.0f;
+            }
+        }
+        
+    }
 
 """)

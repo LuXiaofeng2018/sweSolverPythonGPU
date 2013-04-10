@@ -17,8 +17,8 @@ from modelChecker import *
 printGPUMemUsage()
 
 # Build test mesh
-m = 64  # number of rows
-n = 64  # number of columns
+m = 16  # number of rows
+n = 16  # number of columns
 freeSurface = 1.5
 cellWidth = 1.0
 cellHeight = 1.0
@@ -58,6 +58,7 @@ meshHUVIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)
 meshPropSpeedsGPU = gpuarray.zeros((m, n, 4), np.float32)
 meshFluxesGPU = gpuarray.zeros((m, n, 2, 3), np.float32)
 meshSlopeSourceGPU = gpuarray.zeros((m, n, 2), np.float32)
+meshShearSourceGPU = gpuarray.zeros((m, n), np.float32)
 
 printGPUMemUsage()
 
@@ -69,6 +70,7 @@ updateUIntPts = spacialModule.get_function("updateUIntPts")
 calculatePropagationSpeeds = spacialModule.get_function("calculatePropagationSpeeds")
 fluxSolver = fluxModule.get_function("fluxSolver")
 bedSlopeSourceSolver = sourceModule.get_function("bedSlopeSourceSolver")
+bedShearSourceSolver = sourceModule.get_function("bedShearSourceSolver")
 
 freeSurfaceTime = reconstructFreeSurface(meshUGPU, meshUIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 positivityTime = preservePositivity(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
@@ -77,12 +79,14 @@ updateUTime = updateUIntPts(meshHUVIntPtsGPU, meshUIntPtsGPU, np.int32(m), np.in
 propSpeedTime = calculatePropagationSpeeds(meshPropSpeedsGPU, meshHUVIntPtsGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 fluxTime = fluxSolver(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 slopeSourceTime = bedSlopeSourceSolver(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
+shearSourceTime = bedShearSourceSolver(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 
 # meshUIntPts = meshUIntPtsGPU.get()
 # huvIntPts = meshHUVIntPtsGPU.get()
 # propSpeeds = meshPropSpeedsGPU.get()
 # fluxes = meshFluxesGPU.get()
-slopeSource = meshSlopeSourceGPU.get()
+# slopeSource = meshSlopeSourceGPU.get()
+shearSource = meshShearSourceGPU.get()
 
 print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
 print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
@@ -91,7 +95,8 @@ print "Time to update U at integration points:\t" + str(updateUTime) + " sec"
 print "Time to calculate propagation speeds:\t" + str(propSpeedTime) + " sec"
 print "Time to calculate fluxes:\t\t" + str(fluxTime) + " sec"
 print "Time to calculate slope source:\t\t" + str(slopeSourceTime) + " sec"
-print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime)
+print "Time to calculate shear source:\t\t" + str(shearSourceTime) + " sec"
+print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime)
 
 direction = 2
 # printCellCenteredMatrix(meshU, m, n, 'meshU')
@@ -101,4 +106,5 @@ direction = 2
 # print4DirectionCellMatrix(propSpeeds, m, n, 2, "propSpeeds")
 # print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
 # print3DMatrix(slopeSource, m, n, 0, "slopeSource")
+printCellCenteredMatrix(shearSource, m, n, "shearSource")
 
