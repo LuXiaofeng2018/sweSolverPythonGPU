@@ -12,7 +12,7 @@ def printCellCenteredMatrix(matrix, m, n, matrixName, index= -1):
         for i in range(m):
             line = ''
             for j in range(n):
-                line += str(matrix[i][j][0]) + "\t"
+                line += str(matrix[i][j][index]) + "\t"
             print line
     else:
         for i in range(m):

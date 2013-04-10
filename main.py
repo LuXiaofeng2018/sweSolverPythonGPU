@@ -19,7 +19,7 @@ printGPUMemUsage()
 # Build test mesh
 m = 16  # number of rows
 n = 16  # number of columns
-freeSurface = 1.5
+freeSurface = 0.0
 cellWidth = 1.0
 cellHeight = 1.0
 
@@ -45,8 +45,8 @@ for i in range(m + 1):
 meshU = np.zeros((m, n, 3))
 for i in range(m):
     for j in range(n):
-        if meshBottomIntPts[i][j][0] <= 0.0:
-            meshU[i][j][0] = 0.0
+        if meshBottomIntPts[i][j][0] <= freeSurface:
+            meshU[i][j][0] = freeSurface
         else:
             meshU[i][j][0] = meshBottomIntPts[i][j][0]
 
@@ -59,6 +59,7 @@ meshPropSpeedsGPU = gpuarray.zeros((m, n, 4), np.float32)
 meshFluxesGPU = gpuarray.zeros((m, n, 2, 3), np.float32)
 meshSlopeSourceGPU = gpuarray.zeros((m, n, 2), np.float32)
 meshShearSourceGPU = gpuarray.zeros((m, n), np.float32)
+meshRValuesGPU = gpuarray.zeros((m, n, 3), np.float32)
 
 printGPUMemUsage()
 
@@ -71,6 +72,8 @@ calculatePropagationSpeeds = spacialModule.get_function("calculatePropagationSpe
 fluxSolver = fluxModule.get_function("fluxSolver")
 bedSlopeSourceSolver = sourceModule.get_function("bedSlopeSourceSolver")
 bedShearSourceSolver = sourceModule.get_function("bedShearSourceSolver")
+buildRValues = fluxModule.get_function("buildRValues")
+
 
 freeSurfaceTime = reconstructFreeSurface(meshUGPU, meshUIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 positivityTime = preservePositivity(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
@@ -80,13 +83,15 @@ propSpeedTime = calculatePropagationSpeeds(meshPropSpeedsGPU, meshHUVIntPtsGPU, 
 fluxTime = fluxSolver(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 slopeSourceTime = bedSlopeSourceSolver(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 shearSourceTime = bedShearSourceSolver(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, np.int32(m), np.int32(n), np.float32(cellWidth), np.float32(cellHeight), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
+buildRTime = buildRValues(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, np.int32(m), np.int32(n), block=(blockDim, blockDim, 1), grid=(gridN, gridM), time_kernel=True)
 
 # meshUIntPts = meshUIntPtsGPU.get()
 # huvIntPts = meshHUVIntPtsGPU.get()
 # propSpeeds = meshPropSpeedsGPU.get()
 # fluxes = meshFluxesGPU.get()
-# slopeSource = meshSlopeSourceGPU.get()
-shearSource = meshShearSourceGPU.get()
+slopeSource = meshSlopeSourceGPU.get()
+# shearSource = meshShearSourceGPU.get()
+RValues = meshRValuesGPU.get()
 
 print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
 print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
@@ -96,7 +101,8 @@ print "Time to calculate propagation speeds:\t" + str(propSpeedTime) + " sec"
 print "Time to calculate fluxes:\t\t" + str(fluxTime) + " sec"
 print "Time to calculate slope source:\t\t" + str(slopeSourceTime) + " sec"
 print "Time to calculate shear source:\t\t" + str(shearSourceTime) + " sec"
-print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime)
+print "Time to build R-values:\t\t\t" + str(buildRTime) + " sec"
+print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime)
 
 direction = 2
 # printCellCenteredMatrix(meshU, m, n, 'meshU')
@@ -105,6 +111,7 @@ direction = 2
 # print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
 # print4DirectionCellMatrix(propSpeeds, m, n, 2, "propSpeeds")
 # print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
-# print3DMatrix(slopeSource, m, n, 0, "slopeSource")
-printCellCenteredMatrix(shearSource, m, n, "shearSource")
+print3DMatrix(slopeSource, m, n, 0, "slopeSource")
+# printCellCenteredMatrix(shearSource, m, n, "shearSource")
+printCellCenteredMatrix(RValues, m, n, "RValues", 1)
 

@@ -49,7 +49,7 @@ fluxModule = SourceModule("""
         int eastIndex = row*n*4*3 + col*4*3 + 2*3;
         int rightWestIndex = row*n*4*3 + (col+1)*4*3 + 3*3;
         
-        if (col > 1 && col < n-2 && row > 1 && row < m-2)
+        if (col < n-1 && row < m-1)
         {
             // North flux stuff
             float b_plus = propSpeeds[(row+1)*n*4 + col*4 + 1];
@@ -96,6 +96,19 @@ fluxModule = SourceModule("""
                     meshFluxes[currFluxCell + 3 + i] = 0.0f;
                 }
             }
+        }
+    }
+    
+    __global__ void buildRValues(float *meshRValues, float *meshFluxes, float *meshSlopeSource, int m, int n)
+    {
+        int row = blockIdx.y * blockDim.y + threadIdx.y + 2;
+        int col = blockIdx.x * blockDim.x + threadIdx.x + 2;
+        
+        if (col < n-2 && row < m-2)
+        {
+            meshRValues[row*n*3 + col*3] = 0.0f - (meshFluxes[row*n*2*3 + col*2*3 + 3] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 3]) - (meshFluxes[row*n*2*3 + col*2*3] - meshFluxes[(row-1)*n*2*3 + col*2*3]);
+            meshRValues[row*n*3 + col*3 + 1] = meshSlopeSource[row*n*2 + col*2] - (meshFluxes[row*n*2*3 + col*2*3 + 4] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 4]) - (meshFluxes[row*n*2*3 + col*2*3 + 1] - meshFluxes[(row-1)*n*2*3 + col*2*3 + 1]);
+            meshRValues[row*n*3 + col*3 + 2] = meshSlopeSource[row*n*2 + col*2 + 1] - (meshFluxes[row*n*2*3 + col*2*3 + 5] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 5]) - (meshFluxes[row*n*2*3 + col*2*3 + 2] - meshFluxes[(row-1)*n*2*3 + col*2*3 + 2]);
         }
     }
 
