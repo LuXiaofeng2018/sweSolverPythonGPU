@@ -3,6 +3,8 @@ Created on Apr 8, 2013
 
 @author: tristan
 '''
+
+import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
@@ -113,3 +115,31 @@ fluxModule = SourceModule("""
     }
 
 """)
+
+
+fluxSolverGPU = fluxModule.get_function("fluxSolver")
+buildRValuesGPU = fluxModule.get_function("buildRValues")
+
+def fluxSolver(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, blockDims, gridDims):
+
+    fluxSolverGPU(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU,
+                  np.int32(m), np.int32(n),
+                  block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, blockDims, gridDims):
+
+    return fluxSolverGPU(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU,
+                  np.int32(m), np.int32(n),
+                  block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def buildRValues(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, blockDims, gridDims):
+
+    buildRValuesGPU(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU,
+                    np.int32(m), np.int32(n),
+                    block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, blockDims, gridDims):
+
+    return buildRValuesGPU(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU,
+                    np.int32(m), np.int32(n),
+                    block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)

@@ -3,6 +3,7 @@ Created on Apr 9, 2013
 
 @author: tristan
 '''
+import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
@@ -59,3 +60,31 @@ sourceModule = SourceModule("""
     }
 
 """)
+
+bedSlopeSourceSolver = sourceModule.get_function("bedSlopeSourceSolver")
+bedShearSourceSolver = sourceModule.get_function("bedShearSourceSolver")
+
+def solveBedSlope(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    bedSlopeSourceSolver(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU,
+                         np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                         block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    return bedSlopeSourceSolver(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU,
+                                np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                                block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def solveBedShear(meshBedShearGPU, meshUGPU, meshBottomIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    bedShearSourceSolver(meshBedShearGPU, meshUGPU, meshBottomIntPtsGPU,
+                         np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                         block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def solveBedShearTimed(meshBedShearGPU, meshUGPU, meshBottomIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    return bedShearSourceSolver(meshBedShearGPU, meshUGPU, meshBottomIntPtsGPU,
+                                np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                                block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+

@@ -4,6 +4,7 @@ Created on Apr 3, 2013
 @author: tristan
 '''
 
+import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
@@ -250,4 +251,69 @@ spacialModule = SourceModule("""
 """)
 
 
+reconstructFreeSurfaceGPU = spacialModule.get_function("reconstructFreeSurface")
+preservePositivityGPU = spacialModule.get_function("preservePositivity")
+calculateHUVGPU = spacialModule.get_function("calculateHUV")
+updateUIntPtsGPU = spacialModule.get_function("updateUIntPts")
+calculatePropagationSpeedsGPU = spacialModule.get_function("calculatePropagationSpeeds")
+
+def reconstructFreeSurface(meshUGPU, meshUIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    reconstructFreeSurfaceGPU(meshUGPU, meshUIntPtsGPU,
+                              np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                              block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    return reconstructFreeSurfaceGPU(meshUGPU, meshUIntPtsGPU,
+                                     np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                                     block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def preservePositivity(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, blockDims, gridDims):
+
+    preservePositivityGPU(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU,
+                          np.int32(m), np.int32(n),
+                          block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, blockDims, gridDims):
+
+    return preservePositivityGPU(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU,
+                          np.int32(m), np.int32(n),
+                          block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def calculateHUV(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    calculateHUVGPU(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU,
+                    np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                    block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
+
+    return calculateHUVGPU(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU,
+                    np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                    block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def updateUIntPts(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, blockDims, gridDims):
+
+    updateUIntPtsGPU(meshHUVIntPtsGPU, meshUIntPtsGPU,
+                    np.int32(m), np.int32(n),
+                    block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, blockDims, gridDims):
+
+    return updateUIntPtsGPU(meshHUVIntPtsGPU, meshUIntPtsGPU,
+                    np.int32(m), np.int32(n),
+                    block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def calculatePropSpeeds(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, blockDims, gridDims):
+
+    calculatePropagationSpeedsGPU(meshPropSpeedsGPU, meshHUVIntPtsGPU,
+                                  np.int32(m), np.int32(n),
+                                  block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, blockDims, gridDims):
+
+    return calculatePropagationSpeedsGPU(meshPropSpeedsGPU, meshHUVIntPtsGPU,
+                                  np.int32(m), np.int32(n),
+                                  block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
 
