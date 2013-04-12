@@ -35,5 +35,22 @@ timeModule = SourceModule("""
         }
         
     }
+    
+    __global__ void buildUnext(float *meshUnext, float *meshU, float *meshUstar, float *meshRstar, float *meshShearSourceStar, float dt, int m, int n)
+    {
+        int row = blockIdx.y * blockDim.y + threadIdx.y + 2;
+        int col = blockIdx.x * blockDim.x + threadIdx.x + 2;
+        
+        int uIndex = row*n*3 + col*3;
+        
+        if (row < m-2 && col < n-2)
+        {
+            meshUnext[uIndex] = 0.5f * meshU[uIndex] + 0.5f * (meshUstar[uIndex] + dt*meshRstar[uIndex]);
+            meshUnext[uIndex+1] = (0.5f * meshU[uIndex+1] + 0.5f * (meshUstar[uIndex+1] + dt*meshRstar[uIndex+1])) / (1.0f + 0.5f * dt * meshShearSourceStar[row*n+col]);
+            meshUnext[uIndex+2] = (0.5f * meshU[uIndex+2] + 0.5f * (meshUstar[uIndex+2] + dt*meshRstar[uIndex+2])) / (1.0f + 0.5f * dt * meshShearSourceStar[row*n+col]);
+        } 
+    }
 
 """)
+
+

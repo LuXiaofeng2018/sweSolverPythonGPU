@@ -17,8 +17,8 @@ from modelChecker import *
 printGPUMemUsage()
 
 # Build test mesh
-m = 16  # number of rows
-n = 16  # number of columns
+m = 32  # number of rows
+n = 32  # number of columns
 freeSurface = 0.0
 cellWidth = 1.0
 cellHeight = 1.0
@@ -52,8 +52,8 @@ for i in range(m):
 
 
 meshUGPU = sendToGPU(meshU)
-meshUIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)  # Empty U for in-cell integration points
-meshBottomIntPtsGPU = sendToGPU(meshBottomIntPts)  # gpuarray.zeros((m + 1, n + 1, 2), np.float32)  # Flat bottom with zero elevation
+meshUIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)
+meshBottomIntPtsGPU = sendToGPU(meshBottomIntPts)
 meshHUVIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)
 meshPropSpeedsGPU = gpuarray.zeros((m, n, 4), np.float32)
 meshFluxesGPU = gpuarray.zeros((m, n, 2, 3), np.float32)
