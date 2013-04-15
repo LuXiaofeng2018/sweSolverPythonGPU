@@ -3,6 +3,8 @@ Created on Apr 9, 2013
 
 @author: tristan
 '''
+
+import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
 import pycuda.cumath as cumath
@@ -53,4 +55,29 @@ timeModule = SourceModule("""
 
 """)
 
+uStarSolver = timeModule.get_function("buildUstar")
+uNextSolver = timeModule.get_function("buildUnext")
 
+def buildUstar(meshUstarGPU, meshUGPU, meshRGPU, meshShearGPU, dt, m, n, blockDims, gridDims):
+
+    uStarSolver(meshUstarGPU, meshUGPU, meshRGPU, meshShearGPU,
+                np.float32(dt), np.int32(m), np.int32(n),
+                block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def buildUstarTimed(meshUstarGPU, meshUGPU, meshRGPU, meshShearGPU, dt, m, n, blockDims, gridDims):
+
+    return uStarSolver(meshUstarGPU, meshUGPU, meshRGPU, meshShearGPU,
+                       np.float32(dt), np.int32(m), np.int32(n),
+                       block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def buildUnext(meshUnextGPU, meshUGPU, meshUstarGPU, meshRstar, meshShearStar, dt, m, n, blockDims, gridDims):
+
+    uNextSolver(meshUnextGPU, meshUGPU, meshUstarGPU, meshRstar, meshShearStar,
+                np.float32(dt), np.int32(m), np.int32(n),
+                block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def buildUnextTimed(meshUnextGPU, meshUGPU, meshUstarGPU, meshRstar, meshShearStar, dt, m, n, blockDims, gridDims):
+
+    return uNextSolver(meshUnextGPU, meshUGPU, meshUstarGPU, meshRstar, meshShearStar,
+                       np.float32(dt), np.int32(m), np.int32(n),
+                       block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)

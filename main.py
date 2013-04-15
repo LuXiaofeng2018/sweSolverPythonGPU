@@ -16,9 +16,14 @@ from modelChecker import *
 
 printGPUMemUsage()
 
+time = 0.0
+dt = 0.0
+runTime = 10.0
+simTime = 0.0
+
 # Build test mesh
-m = 32  # number of rows
-n = 32  # number of columns
+m = 64  # number of rows
+n = 64  # number of columns
 freeSurface = 0.0
 cellWidth = 1.0
 cellHeight = 1.0
@@ -51,6 +56,7 @@ for i in range(m):
             meshU[i][j][0] = meshBottomIntPts[i][j][0]
 
 
+# Allocate memory on GPU
 meshUGPU = sendToGPU(meshU)
 meshUIntPtsGPU = gpuarray.zeros((m, n, 4, 3), np.float32)
 meshBottomIntPtsGPU = sendToGPU(meshBottomIntPts)
@@ -60,43 +66,95 @@ meshFluxesGPU = gpuarray.zeros((m, n, 2, 3), np.float32)
 meshSlopeSourceGPU = gpuarray.zeros((m, n, 2), np.float32)
 meshShearSourceGPU = gpuarray.zeros((m, n), np.float32)
 meshRValuesGPU = gpuarray.zeros((m, n, 3), np.float32)
+meshUstarGPU = gpuarray.zeros_like(meshUGPU)
 
 printGPUMemUsage()
 
 
-freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-timestep = calculateTimestep(meshPropSpeedsGPU, cellWidth)
-print "Timestep: " + str(timestep)
+# Start Timestepping
+while time < runTime:
+
+    # Reconstruct free surface
+    freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+
+    # Calculate Fluxes and Source Terms
+    fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+
+    # Calculate Timestep
+    dt = calculateTimestep(meshPropSpeedsGPU, cellWidth)
+
+    # Build U*
+    uStarTime = buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+
+    # Reconstruct free surface
+    freeSurfaceTimeStar = reconstructFreeSurfaceTimed(meshUstarGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    positivityTimeStar = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    huvTimeStar = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    updateUstarTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    propSpeedStarTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+
+    # Calculate Fluxes and Source Terms
+    fluxStarTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    slopeSourceStarTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    shearSourceStarTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+    buildRStarTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+
+    # Build Unext
+    buildUnextTime = buildUnextTimed(meshUGPU, meshUGPU, meshUstarGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+
+    timestepTime = (freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime +
+                    uStarTime + freeSurfaceTimeStar + positivityTimeStar + huvTimeStar + updateUstarTime + propSpeedStarTime + fluxStarTime + slopeSourceStarTime +
+                    shearSourceStarTime + buildRStarTime + buildUnextTime)
+
+    simTime += timestepTime
+
+    # print "Total timestep calculation time: " + str(timestepTime) + " sec"
+    time += dt
+
+print "Total simulation time: " + str(simTime) + " seconds"
+
+# freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+# positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+# huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+# updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+# propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+# fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+# slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+# shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+# buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+# timestep = calculateTimestep(meshPropSpeedsGPU, cellWidth)
+# print "Timestep: " + str(timestep)
+# uStarTime = buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, timestep, m, n, [blockDim, blockDim], [gridN, gridM])
 
 # meshUIntPts = meshUIntPtsGPU.get()
 # huvIntPts = meshHUVIntPtsGPU.get()
 # propSpeeds = meshPropSpeedsGPU.get()
 # fluxes = meshFluxesGPU.get()
-slopeSource = meshSlopeSourceGPU.get()
+# slopeSource = meshSlopeSourceGPU.get()
 # shearSource = meshShearSourceGPU.get()
-RValues = meshRValuesGPU.get()
+# RValues = meshRValuesGPU.get()
 
 
-print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
-print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
-print "Time to calculate huv:\t\t\t" + str(huvTime) + " sec"
-print "Time to update U at integration points:\t" + str(updateUTime) + " sec"
-print "Time to calculate propagation speeds:\t" + str(propSpeedTime) + " sec"
-print "Time to calculate fluxes:\t\t" + str(fluxTime) + " sec"
-print "Time to calculate slope source:\t\t" + str(slopeSourceTime) + " sec"
-print "Time to calculate shear source:\t\t" + str(shearSourceTime) + " sec"
-print "Time to build R-values:\t\t\t" + str(buildRTime) + " sec"
-print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime)
+# print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
+# print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
+# print "Time to calculate huv:\t\t\t" + str(huvTime) + " sec"
+# print "Time to update U at integration points:\t" + str(updateUTime) + " sec"
+# print "Time to calculate propagation speeds:\t" + str(propSpeedTime) + " sec"
+# print "Time to calculate fluxes:\t\t" + str(fluxTime) + " sec"
+# print "Time to calculate slope source:\t\t" + str(slopeSourceTime) + " sec"
+# print "Time to calculate shear source:\t\t" + str(shearSourceTime) + " sec"
+# print "Time to build R-values:\t\t\t" + str(buildRTime) + " sec"
+# print "Time to build Unext:\t\t\t" + str(uStarTime) + " sec"
+# print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime + uStarTime)
 
-direction = 2
+# direction = 2
 # printCellCenteredMatrix(meshU, m, n, 'meshU')
 # print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
 # print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
