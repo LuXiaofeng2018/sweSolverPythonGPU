@@ -157,8 +157,8 @@ def buildPyramidTestU(meshCoordinates, meshBottomCenters, middleDepth, outerDept
     n = meshCoordinates.shape[1] - 1
 
     pyramidSize = pyramidSize - pyramidSize % 2
-    centerX = (m - m % 2) / 2 + 8
-    centerY = (n - n % 2) / 2 + 8
+    centerX = (m - m % 2) / 2 + 2
+    centerY = (n - n % 2) / 2 + 2
     leftX = centerX - pyramidSize / 2
     bottomY = centerY - pyramidSize / 2
     rightX = leftX + pyramidSize
