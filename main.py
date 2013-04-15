@@ -14,6 +14,7 @@ from sourceCalculations import *
 from timestepper import *
 from modelChecker import *
 from dataSaver import *
+from meshBuilder import *
 
 printGPUMemUsage()
 
@@ -31,47 +32,51 @@ n = 16  # number of columns
 freeSurface = 0.0
 cellWidth = 1.0
 cellHeight = 1.0
+gridSize = 28
 
 # Calculate GPU grid/block sizes
 blockDim = 16
 gridM = m / blockDim + (1 if (m % blockDim != 0) else 0)
 gridN = n / blockDim + (1 if (n % blockDim != 0) else 0)
 
-meshCoordinates = np.zeros((m + 1, n + 1, 3))
-for i in range(m + 1):
-    for j in range(n + 1):
-        meshCoordinates[i][j][0] = float(j)
-        meshCoordinates[i][j][1] = float(i)
-        if j <= n / 2:
-            meshCoordinates[i][j][2] = j - 5.0
-        else:
-            meshCoordinates[i][j][2] = n - j - 5.0
+meshCoordinates, meshBottomIntPts, meshBottomSlopes, meshBottomCenters = buildDoubleSlopingTestMesh(gridSize, 2, cellWidth, cellHeight, 1.0, 0.1, 12)
+meshU = buildPyramidTestU(meshCoordinates, meshBottomCenters, 5.0, 4.5, 8)
 
+# meshCoordinates = np.zeros((m + 1, n + 1, 3))
+# for i in range(m + 1):
+#     for j in range(n + 1):
+#         meshCoordinates[i][j][0] = float(j)
+#         meshCoordinates[i][j][1] = float(i)
+#         if j <= n / 2:
+#             meshCoordinates[i][j][2] = j - 5.0
+#         else:
+#             meshCoordinates[i][j][2] = n - j - 5.0
+#
 if saveOutput:
     writeCustomFort14(workingDir, meshCoordinates)
     fort63 = createFort63(workingDir, meshCoordinates)
-
-meshBottomIntPts = np.zeros((m + 1, n + 1, 2))
-for i in range(m + 1):
-    for j in range(n + 1):
-        if j < n / 2:
-            if j == n / 2 - 1:
-                meshBottomIntPts[i][j][0] = j - 5.0
-                meshBottomIntPts[i][j][1] = j - 5.0
-            else:
-                meshBottomIntPts[i][j][0] = j + 0.5 - 5.0
-                meshBottomIntPts[i][j][1] = j - 5.0
-        else:
-            meshBottomIntPts[i][j][0] = n - j - 1 - 0.5 - 5.0
-            meshBottomIntPts[i][j][1] = n - j - 1 - 5.0
-
-meshU = np.zeros((m, n, 3))
-for i in range(m):
-    for j in range(n):
-        if meshBottomIntPts[i][j][0] <= freeSurface:
-            meshU[i][j][0] = freeSurface
-        else:
-            meshU[i][j][0] = meshBottomIntPts[i][j][0]
+#
+# meshBottomIntPts = np.zeros((m + 1, n + 1, 2))
+# for i in range(m + 1):
+#     for j in range(n + 1):
+#         if j < n / 2:
+#             if j == n / 2 - 1:
+#                 meshBottomIntPts[i][j][0] = j - 5.0
+#                 meshBottomIntPts[i][j][1] = j - 5.0
+#             else:
+#                 meshBottomIntPts[i][j][0] = j + 0.5 - 5.0
+#                 meshBottomIntPts[i][j][1] = j - 5.0
+#         else:
+#             meshBottomIntPts[i][j][0] = n - j - 1 - 0.5 - 5.0
+#             meshBottomIntPts[i][j][1] = n - j - 1 - 5.0
+#
+# meshU = np.zeros((m, n, 3))
+# for i in range(m):
+#     for j in range(n):
+#         if meshBottomIntPts[i][j][0] <= freeSurface:
+#             meshU[i][j][0] = freeSurface
+#         else:
+#             meshU[i][j][0] = meshBottomIntPts[i][j][0]
 
 
 # Allocate memory on GPU
