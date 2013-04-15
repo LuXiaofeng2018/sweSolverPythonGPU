@@ -12,6 +12,7 @@ from spacialDiscretization import *
 from fluxCalculations import *
 from sourceCalculations import *
 from timestepper import *
+from boundaryConditions import *
 from modelChecker import *
 from dataSaver import *
 from meshBuilder import *
@@ -117,8 +118,9 @@ while time < runTime:
     # Calculate Timestep
     dt = calculateTimestep(meshPropSpeedsGPU, cellWidth)
 
-    # Build U*
+    # Build U* and apply boundary conditions
     uStarTime = buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+    bcTimeStar = applyWallBoundariesTimed(meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
     # Reconstruct free surface
     freeSurfaceTimeStar = reconstructFreeSurfaceTimed(meshUstarGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
@@ -133,12 +135,13 @@ while time < runTime:
     shearSourceStarTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
     buildRStarTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
-    # Build Unext
+    # Build Unext and apply boundary conditions
     buildUnextTime = buildUnextTimed(meshUGPU, meshUGPU, meshUstarGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+    bcTime = applyWallBoundariesTimed(meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
     timestepTime = (freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime +
-                    uStarTime + freeSurfaceTimeStar + positivityTimeStar + huvTimeStar + updateUstarTime + propSpeedStarTime + fluxStarTime + slopeSourceStarTime +
-                    shearSourceStarTime + buildRStarTime + buildUnextTime)
+                    uStarTime + bcTimeStar + freeSurfaceTimeStar + positivityTimeStar + huvTimeStar + updateUstarTime + propSpeedStarTime + fluxStarTime + slopeSourceStarTime +
+                    shearSourceStarTime + buildRStarTime + buildUnextTime + bcTime)
 
     simTime += timestepTime
 
