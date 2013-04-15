@@ -13,17 +13,21 @@ from fluxCalculations import *
 from sourceCalculations import *
 from timestepper import *
 from modelChecker import *
+from dataSaver import *
 
 printGPUMemUsage()
 
+workingDir = "/home/tristan/Desktop/"
+saveOutput = True
 time = 0.0
 dt = 0.0
 runTime = 10.0
 simTime = 0.0
+iterations = 0
 
 # Build test mesh
-m = 64  # number of rows
-n = 64  # number of columns
+m = 16  # number of rows
+n = 16  # number of columns
 freeSurface = 0.0
 cellWidth = 1.0
 cellHeight = 1.0
@@ -32,6 +36,20 @@ cellHeight = 1.0
 blockDim = 16
 gridM = m / blockDim + (1 if (m % blockDim != 0) else 0)
 gridN = n / blockDim + (1 if (n % blockDim != 0) else 0)
+
+meshCoordinates = np.zeros((m + 1, n + 1, 3))
+for i in range(m + 1):
+    for j in range(n + 1):
+        meshCoordinates[i][j][0] = float(j)
+        meshCoordinates[i][j][1] = float(i)
+        if j <= n / 2:
+            meshCoordinates[i][j][2] = j - 5.0
+        else:
+            meshCoordinates[i][j][2] = n - j - 5.0
+
+if saveOutput:
+    writeCustomFort14(workingDir, meshCoordinates)
+    fort63 = createFort63(workingDir, meshCoordinates)
 
 meshBottomIntPts = np.zeros((m + 1, n + 1, 2))
 for i in range(m + 1):
@@ -73,6 +91,10 @@ printGPUMemUsage()
 
 # Start Timestepping
 while time < runTime:
+
+    if saveOutput:
+        meshU = meshUGPU.get()
+        writeCustomTimestep(fort63, meshU)
 
     # Reconstruct free surface
     freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
@@ -117,7 +139,11 @@ while time < runTime:
 
     # print "Total timestep calculation time: " + str(timestepTime) + " sec"
     time += dt
+    iterations += 1
 
+if saveOutput:
+    closeCustomFort63(workingDir, fort63, meshU, iterations)
+    print "Finished. " + str(iterations) + " timesteps saved."
 print "Total simulation time: " + str(simTime) + " seconds"
 
 # freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
