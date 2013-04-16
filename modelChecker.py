@@ -27,7 +27,7 @@ def print3DMatrix(matrix, m, n, index, matrixName=""):
     for i in range(m):
         line = ''
         for j in range(n):
-            line += str(matrix[i][j][index]) + "\t"
+            line += "%.4f" % matrix[i][j][index] + "\t"
         print line
 
 

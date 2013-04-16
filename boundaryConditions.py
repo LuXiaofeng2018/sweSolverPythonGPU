@@ -15,26 +15,26 @@ boundaryConditionsModule = SourceModule("""
         int row = blockIdx.y * blockDim.y + threadIdx.y;
         int col = blockIdx.x * blockDim.x + threadIdx.x;
         
-        if (row < 2)
+        if (row < 2 && col < n)
         {
             meshU[row*n*3 + col*3] = meshU[(3-row)*n*3 + col*3];
-            meshU[row*n*3 + col*3 + 2] = meshU[(3-row)*n*3 + col*3 +2];
+            meshU[row*n*3 + col*3 + 2] = -meshU[(3-row)*n*3 + col*3 + 2];
         }
-        else if (row > m-3 && row < m)
+        else if (row > m-3 && row < m && col < n)
         {
             meshU[row*n*3 + col*3] = meshU[(2*m-5-row)*n*3 + col*3];
-            meshU[row*n*3 + col*3 + 2] = meshU[(2*m-5-row)*n*3 + col*3 + 2];
+            meshU[row*n*3 + col*3 + 2] = -meshU[(2*m-5-row)*n*3 + col*3 + 2];
         }
         
-        if (col < 2)
+        if (col < 2 && row < m)
         {
             meshU[row*n*3 + col*3] = meshU[row*n*3 + (3-col)*3];
-            meshU[row*n*3 + col*3 + 1] = meshU[row*n*3 + (3-col)*3 + 1];
+            meshU[row*n*3 + col*3 + 1] = -meshU[row*n*3 + (3-col)*3 + 1];
         }
-        else if (col > n-3 && col < n)
+        else if (col > n-3 && col < n && row < m)
         {
             meshU[row*n*3 + col*3] = meshU[row*n*3 + (2*n-5-col)*3];
-            meshU[row*n*3 + col*3 + 1] = meshU[row*n*3 + (2*n-5-col)*3 + 1];
+            meshU[row*n*3 + col*3 + 1] = -meshU[row*n*3 + (2*n-5-col)*3 + 1];
         }
     }
 
