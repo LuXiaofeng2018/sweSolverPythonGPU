@@ -21,6 +21,7 @@ printGPUMemUsage()
 
 workingDir = "/home/tristan/Desktop/"
 saveOutput = True
+test = True
 time = 0.0
 dt = 0.0
 runTime = 10.0
@@ -28,8 +29,6 @@ simTime = 0.0
 iterations = 0
 
 # Build test mesh
-m = 12  # number of rows
-n = 12  # number of columns
 freeSurface = 0.0
 cellWidth = 1.0
 cellHeight = 1.0
@@ -105,11 +104,20 @@ while time < runTime:
         writeCustomTimestep(fort63, meshU)
 
     # Reconstruct free surface
-    freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-    positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-    updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    if (test == False):
+        freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        fullTime = 0.0
+    else:
+        freeSurfaceTime = 0.0
+        positivityTime = 0.0
+        huvTime = 0.0
+        updateUTime = 0.0
+        propSpeedTime = 0.0
+        fullTime = fullPropSpeedsTimed(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 
     # Calculate Fluxes and Source Terms
     fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
@@ -132,11 +140,20 @@ while time < runTime:
     # print3DMatrix(uStar, m, n, 2, "uStar")
 
     # Reconstruct free surface
-    freeSurfaceTimeStar = reconstructFreeSurfaceTimed(meshUstarGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-    positivityTimeStar = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    huvTimeStar = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-    updateUstarTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    propSpeedStarTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+    if (test == False):
+        freeSurfaceTimeStar = reconstructFreeSurfaceTimed(meshUstarGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        positivityTimeStar = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        huvTimeStar = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        updateUstarTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        propSpeedStarTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        fullTimeStar = 0.0
+    else:
+        freeSurfaceTimeStar = 0.0
+        positivityTimeStar = 0.0
+        huvTimeStar = 0.0
+        updateUstarTime = 0.0
+        propSpeedStarTime = 0.0
+        fullTimeStar = fullPropSpeedsTimed(meshUstarGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 
     # Calculate Fluxes and Source Terms
     fluxStarTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
@@ -156,7 +173,7 @@ while time < runTime:
 
     timestepTime = (freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime +
                    uStarTime + bcTimeStar + freeSurfaceTimeStar + positivityTimeStar + huvTimeStar + updateUstarTime + propSpeedStarTime + fluxStarTime + slopeSourceStarTime +
-                   shearSourceStarTime + buildRStarTime + buildUnextTime + bcTime)
+                   shearSourceStarTime + buildRStarTime + buildUnextTime + bcTime + fullTime + fullTimeStar)
 
     simTime += timestepTime
 

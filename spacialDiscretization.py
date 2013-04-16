@@ -17,6 +17,156 @@ spacialModule = SourceModule("""
         float ab = fminf(fabsf(a), fabsf(b)) * (copysignf(1.0f, a) + copysignf(1.0f, b)) * 0.5f;
         return fminf(fabsf(ab), fabsf(c)) * (copysignf(1.0f, ab) + copysignf(1.0f, c)) * 0.5f;
     }
+    
+    __global__ void FullPropSpeeds(float *meshU, float *meshBottomIntPts, float *meshUIntPts, float *huvIntPts, float *propSpeeds, int m, int n, float dx, float dy)
+    {
+        int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
+        int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
+        
+        float N[3], S[3], E[3], W[3];    // These are the [w, hu, hv] vectors
+        float n_vec[3], s_vec[3], e_vec[3], w_vec[3];    // These are the [h, u, v] vectors
+        
+        if (col < n-1 && row < m-1)
+        {
+            float forward, central, backward, slope;
+            float Kappa = 0.01f * fmaxf(1.0f, fminf(dx, dy));
+            float sqrt2 = sqrtf(2.0f);
+            float g = 9.81f;
+            
+            for (int i=0; i<3; i++)
+            {
+                // North and South
+                forward = (meshU[(row+1)*n*3 + col*3 + i] - meshU[row*n*3 + col*3 + i])/dy;
+                central = (meshU[(row+1)*n*3 + col*3 + i] - meshU[(row-1)*n*3 + col*3 + i])/(2*dy);
+                backward = (meshU[row*n*3 + col*3 + i] - meshU[(row-1)*n*3 + col*3 + i])/dy;
+                slope = minmod(1.3f*forward, central, 1.3f*backward);
+                
+                N[i] = meshU[row*n*3 + col*3 + i] + (dy/2.0f)*slope;
+                S[i] = meshU[row*n*3 + col*3 + i] - (dy/2.0f)*slope;
+            
+                // East and West
+                forward = (meshU[row*n*3 + (col+1)*3 + i] - meshU[row*n*3 + col*3 + i])/dx;
+                central = (meshU[row*n*3 + (col+1)*3 + i] - meshU[row*n*3 + (col-1)*3 + i])/(2*dx);
+                backward = (meshU[row*n*3 + col*3 + i] - meshU[row*n*3 + (col-1)*3 + i])/dx;
+                slope = minmod(1.3f*forward, central, 1.3f*backward);
+                
+                E[i] = meshU[row*n*3 + col*3 + i] + (dx/2.0f)*slope;
+                W[i] = meshU[row*n*3 + col*3 + i] - (dx/2.0f)*slope;
+            }
+            
+            if (N[0] < meshBottomIntPts[row*(n+1)*2 + col*2 + (n+1)*2])
+            {
+                N[0] = meshBottomIntPts[row*(n+1)*2 + col*2 + (n+1)*2];
+                S[0] = 2*meshU[row*n*3 + col*3] - meshBottomIntPts[row*(n+1)*2 + col*2 + (n+1)*2];
+            }
+            else if (S[0] < meshBottomIntPts[row*(n+1)*2 + col*2])
+            {
+                S[0] = meshBottomIntPts[row*(n+1)*2 + col*2];
+                N[0] = 2*meshU[row*n*3 + col*3] - meshBottomIntPts[row*(n+1)*2 + col*2];
+            }
+            
+            if (E[0] < meshBottomIntPts[row*(n+1)*2 + col*2+3])
+            {
+                E[0] = meshBottomIntPts[row*(n+1)*2 + col*2+3];
+                W[0] = 2*meshU[row*n*3 + col*3] - meshBottomIntPts[row*(n+1)*2 + col*2+3];
+            }
+            else if (W[0] < meshBottomIntPts[row*(n+1)*2 + col*2+1])
+            {
+                W[0] = meshBottomIntPts[row*(n+1)*2 + col*2+1];
+                E[0] = 2*meshU[row*n*3 + col*3] - meshBottomIntPts[row*(n+1)*2 + col*2+1];
+            }
+            
+            // Calculate h at the four integration points
+            n_vec[0] = N[0] - meshBottomIntPts[row*(n+1)*2 + col*2 + (n+1)*2];
+            s_vec[0] = S[0] - meshBottomIntPts[row*(n+1)*2 + col*2];
+            e_vec[0] = E[0] - meshBottomIntPts[row*(n+1)*2 + col*2+3];
+            w_vec[0] = W[0] - meshBottomIntPts[row*(n+1)*2 + col*2+1];
+            
+            // Calculate u at the four integration points
+            n_vec[1] = (sqrt2 * n_vec[0] * N[1]) / sqrtf(powf(n_vec[0], 4.0f) + fmaxf(powf(n_vec[0], 4.0f), Kappa));
+            s_vec[1] = (sqrt2 * s_vec[0] * S[1]) / sqrtf(powf(s_vec[0], 4.0f) + fmaxf(powf(s_vec[0], 4.0f), Kappa));
+            e_vec[1] = (sqrt2 * e_vec[0] * E[1]) / sqrtf(powf(e_vec[0], 4.0f) + fmaxf(powf(e_vec[0], 4.0f), Kappa));
+            w_vec[1] = (sqrt2 * w_vec[0] * W[1]) / sqrtf(powf(w_vec[0], 4.0f) + fmaxf(powf(w_vec[0], 4.0f), Kappa));
+            
+            // Calculate v at the four integration points
+            n_vec[2] = (sqrt2 * n_vec[0] * N[2]) / sqrtf(powf(n_vec[0], 4.0f) + fmaxf(powf(n_vec[0], 4.0f), Kappa));
+            s_vec[2] = (sqrt2 * s_vec[0] * S[2]) / sqrtf(powf(s_vec[0], 4.0f) + fmaxf(powf(s_vec[0], 4.0f), Kappa));
+            e_vec[2] = (sqrt2 * e_vec[0] * E[2]) / sqrtf(powf(e_vec[0], 4.0f) + fmaxf(powf(e_vec[0], 4.0f), Kappa));
+            w_vec[2] = (sqrt2 * w_vec[0] * W[2]) / sqrtf(powf(w_vec[0], 4.0f) + fmaxf(powf(w_vec[0], 4.0f), Kappa));
+            
+            // Update hu and hv North
+            N[1] = n_vec[0] * n_vec[1];
+            N[2] = n_vec[0] * n_vec[2];
+            
+            // Update hu and hv South
+            S[1] = s_vec[0] * s_vec[1];
+            S[2] = s_vec[0] * s_vec[2];
+            
+            // Update hu and hv East
+            E[1] = e_vec[0] * e_vec[1];
+            E[2] = e_vec[0] * e_vec[2];
+            
+            // Update hu and hv West
+            W[1] = w_vec[0] * w_vec[1];
+            W[2] = w_vec[0] * w_vec[2];
+            
+            
+            // Make sure all threads reach this point before continuing
+            __syncthreads();
+            
+            
+            // Push meshUIntPts and huv to global memory
+            meshUIntPts[row*n*4*3 + col*4*3 + 0*3] = N[0];
+            meshUIntPts[row*n*4*3 + col*4*3 + 0*3 + 1] = N[1];
+            meshUIntPts[row*n*4*3 + col*4*3 + 0*3 + 2] = N[2];
+            
+            meshUIntPts[row*n*4*3 + col*4*3 + 1*3] = S[0];
+            meshUIntPts[row*n*4*3 + col*4*3 + 1*3 + 1] = S[1];
+            meshUIntPts[row*n*4*3 + col*4*3 + 1*3 + 2] = S[2];
+            
+            meshUIntPts[row*n*4*3 + col*4*3 + 2*3] = E[0];
+            meshUIntPts[row*n*4*3 + col*4*3 + 2*3 + 1] = E[1];
+            meshUIntPts[row*n*4*3 + col*4*3 + 2*3 + 2] = E[2];
+            
+            meshUIntPts[row*n*4*3 + col*4*3 + 3*3] = W[0];
+            meshUIntPts[row*n*4*3 + col*4*3 + 3*3 + 1] = W[1];
+            meshUIntPts[row*n*4*3 + col*4*3 + 3*3 + 2] = W[2];
+            
+            huvIntPts[row*n*4*3 + col*4*3 + 0*3] = n_vec[0];
+            huvIntPts[row*n*4*3 + col*4*3 + 0*3 + 1] = n_vec[1];
+            huvIntPts[row*n*4*3 + col*4*3 + 0*3 + 2] = n_vec[2];
+            
+            huvIntPts[row*n*4*3 + col*4*3 + 1*3] = s_vec[0];
+            huvIntPts[row*n*4*3 + col*4*3 + 1*3 + 1] = s_vec[1];
+            huvIntPts[row*n*4*3 + col*4*3 + 1*3 + 2] = s_vec[2];
+            
+            huvIntPts[row*n*4*3 + col*4*3 + 2*3] = e_vec[0];
+            huvIntPts[row*n*4*3 + col*4*3 + 2*3 + 1] = e_vec[1];
+            huvIntPts[row*n*4*3 + col*4*3 + 2*3 + 2] = e_vec[2];
+            
+            huvIntPts[row*n*4*3 + col*4*3 + 3*3] = w_vec[0];
+            huvIntPts[row*n*4*3 + col*4*3 + 3*3 + 1] = w_vec[1];
+            huvIntPts[row*n*4*3 + col*4*3 + 3*3 + 2] = w_vec[2];
+            
+            
+            // Shouldnt need this, but just be sure that all global memory writes have finished
+            __syncthreads();
+            
+            
+            // North propagation speed of this cell
+            propSpeeds[row*n*4 + col*4 + 0] = fminf(fminf(huvIntPts[row*n*4*3 + col*4*3 + 0*3+2] - sqrtf(g * huvIntPts[row*n*4*3 + col*4*3 + 0*3]), huvIntPts[(row+1)*n*4*3 + col*4*3 + 1*3+2] - sqrtf(g * huvIntPts[(row+1)*n*4*3 + col*4*3 + 1*3])), 0.0f);
+            
+            // South propagation speed of the cell above this one
+            propSpeeds[(row+1)*n*4 + col*4 + 1] = fmaxf(fmaxf(huvIntPts[row*n*4*3 + col*4*3 + 0*3+2] + sqrtf(g * huvIntPts[row*n*4*3 + col*4*3 + 0*3]), huvIntPts[(row+1)*n*4*3 + col*4*3 + 1*3+2] + sqrtf(g * huvIntPts[(row+1)*n*4*3 + col*4*3 + 1*3])), 0.0f);
+            
+            // East propagation speed of this cell
+            propSpeeds[row*n*4 + col*4 + 2] = fminf(fminf(huvIntPts[row*n*4*3 + col*4*3 + 2*3+1] - sqrtf(g * huvIntPts[row*n*4*3 + col*4*3 + 2*3]), huvIntPts[row*n*4*3 + (col+1)*4*3 + 3*3+1] - sqrtf(g * huvIntPts[row*n*4*3 + (col+1)*4*3 + 3*3])), 0.0f);
+            
+            // West propagation speed of the cell to the right of this one
+            propSpeeds[row*n*4 + (col+1)*4 + 3] = fmaxf(fmaxf(huvIntPts[row*n*4*3 + col*4*3 + 2*3+1] + sqrtf(g * huvIntPts[row*n*4*3 + col*4*3 + 2*3]), huvIntPts[row*n*4*3 + (col+1)*4*3 + 3*3+1] + sqrtf(g * huvIntPts[row*n*4*3 + (col+1)*4*3 + 3*3])), 0.0f);
+            
+        }
+    }
 
     __global__ void reconstructFreeSurface(float *meshU, float *meshUIntPts, int m, int n, float cellWidth, float cellHeight)
     {
@@ -97,7 +247,6 @@ spacialModule = SourceModule("""
         }
     }
     
-    
     __global__ void calculateHUV(float *huvIntPts, float *meshUIntPts, float *meshBottomIntPts, int m, int n, float dx, float dy)
     {
         int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
@@ -133,7 +282,6 @@ spacialModule = SourceModule("""
         }
     }
     
-    
     // Shared memory would be really easy in this kernel
     __global__ void updateUIntPts(float *huvIntPts, float *meshUIntPts, int m, int n)
     {
@@ -165,7 +313,6 @@ spacialModule = SourceModule("""
          
     }
     
-    
     __global__ void calculatePropagationSpeeds(float *propSpeeds, float *huvIntPts, int m, int n)
     {
         int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
@@ -194,7 +341,7 @@ spacialModule = SourceModule("""
     }
     
     
-    
+
     
     // This kernel doesn't work yet, don't use it
     __global__ void rFSshared(float *meshU, float *meshUIntPts, int m, int n, float cellWidth, float cellHeight)
@@ -256,6 +403,13 @@ preservePositivityGPU = spacialModule.get_function("preservePositivity")
 calculateHUVGPU = spacialModule.get_function("calculateHUV")
 updateUIntPtsGPU = spacialModule.get_function("updateUIntPts")
 calculatePropagationSpeedsGPU = spacialModule.get_function("calculatePropagationSpeeds")
+FullPropSpeeds = spacialModule.get_function("FullPropSpeeds")
+
+def fullPropSpeedsTimed(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, huvIntPtsGPU, propSpeeds, m, n, dx, dy, blockDims, gridDims):
+
+    return FullPropSpeeds(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, huvIntPtsGPU, propSpeeds,
+                          np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                              block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
 
 def reconstructFreeSurface(meshUGPU, meshUIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
 

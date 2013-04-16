@@ -11,6 +11,7 @@ import pycuda.cumath as cumath
 import pycuda.gpuarray as gpuarray
 from pycuda.compiler import SourceModule
 
+
 # This function assumes a square cell and destructively modifies
 # the meshPropSpeedsGPU matrix
 def calculateTimestep(meshPropSpeedsGPU, cellDim):
