@@ -24,25 +24,27 @@ saveOutput = True
 test = True
 time = 0.0
 dt = 0.0
-runTime = 10.0
+runTime = 100.0
+saveTimestepInterval = 0.1
+nextSave = 0.1
 simTime = 0.0
 iterations = 0
+savedTimesteps = 0
 
 # Build test mesh
-freeSurface = 0.0
-cellWidth = 1.0
-cellHeight = 1.0
-gridSize = 32
-m = gridSize + 4
-n = gridSize + 4
+m = 128
+n = 128
+# meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBeachTestMesh(m, n)
+meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBasinTestMesh(m, n)
 
 # Calculate GPU grid/block sizes
 blockDim = 16
 gridM = m / blockDim + (1 if (m % blockDim != 0) else 0)
 gridN = n / blockDim + (1 if (n % blockDim != 0) else 0)
 
-meshCoordinates, meshBottomIntPts, meshBottomSlopes, meshBottomCenters = buildDoubleSlopingTestMesh(gridSize, 2, cellWidth, cellHeight, 1.0, 0.1, 12)
-meshU = buildPyramidTestU(meshCoordinates, meshBottomCenters, 5.0, 2.0, 5)
+
+# meshCoordinates, meshBottomIntPts, meshBottomSlopes, meshBottomCenters = buildDoubleSlopingTestMesh(gridSize, 2, cellWidth, cellHeight, 1.0, 0.1, 12)
+# meshU = buildPyramidTestU(meshCoordinates, meshBottomCenters, 5.0, 2.0, 5)
 
 # print3DMatrix(meshCoordinates, m, n, 2, "meshCoordinates")
 # printCellCenteredMatrix(meshBottomCenters, m, n, "meshbottomcenters")
@@ -104,9 +106,11 @@ printGPUMemUsage()
 # Start Timestepping
 while time < runTime:
 
-    if saveOutput:
+    if saveOutput and time == nextSave:
         meshU = meshUGPU.get()
         writeCustomTimestep(fort63, meshU)
+        savedTimesteps += 1
+        nextSave += saveTimestepInterval
 
     # Reconstruct free surface
     if (test == False):
@@ -133,6 +137,8 @@ while time < runTime:
 
     # Calculate Timestep
     dt = calculateTimestep(meshPropSpeedsGPU, cellWidth)
+    if saveOutput and time + dt > nextSave:
+        dt = nextSave - time
 
     # Build U* and apply boundary conditions
     uStarTime = buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
@@ -187,8 +193,8 @@ while time < runTime:
     iterations += 1
 
 if saveOutput:
-    closeCustomFort63(workingDir, fort63, meshU, iterations)
-    print "Finished. " + str(iterations) + " timesteps saved."
+    closeCustomFort63(workingDir, fort63, meshU, savedTimesteps)
+    print "Finished. " + str(savedTimesteps) + " timesteps saved."
 print "Total simulation time: " + str(simTime) + " seconds"
 
 # freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
