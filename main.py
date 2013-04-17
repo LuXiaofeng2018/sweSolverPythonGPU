@@ -16,15 +16,17 @@ from boundaryConditions import *
 from modelChecker import *
 from dataSaver import *
 from meshBuilder import *
+import time as timer
 
 printGPUMemUsage()
 
 workingDir = "/home/tristan/Desktop/"
 saveOutput = True
 test = True
+timed = True
 time = 0.0
 dt = 0.0
-runTime = 100.0
+runTime = 10.0
 saveTimestepInterval = 0.1
 nextSave = 0.1
 simTime = 0.0
@@ -103,142 +105,164 @@ meshUstarGPU = gpuarray.zeros_like(meshUGPU)
 printGPUMemUsage()
 
 
-# Start Timestepping
-while time < runTime:
+if timed:
+    # Start Timestepping
+    sTime = timer.time()
+    while time < runTime:
 
-    if saveOutput and time == nextSave:
-        meshU = meshUGPU.get()
-        writeCustomTimestep(fort63, meshU)
-        savedTimesteps += 1
-        nextSave += saveTimestepInterval
+        if saveOutput and time == nextSave:
+            meshU = meshUGPU.get()
+            writeCustomTimestep(fort63, meshU)
+            savedTimesteps += 1
+            nextSave += saveTimestepInterval
 
-    # Reconstruct free surface
-    if (test == False):
-        freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-        positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-        huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-        updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-        propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-        fullTime = 0.0
-    else:
-        freeSurfaceTime = 0.0
-        positivityTime = 0.0
-        huvTime = 0.0
-        updateUTime = 0.0
-        propSpeedTime = 0.0
-        fullTime = fullPropSpeedsTimed(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        # Reconstruct free surface
+        if (test == False):
+            freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+            positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+            huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+            updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+            propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+            fullTime = 0.0
+        else:
+            freeSurfaceTime = 0.0
+            positivityTime = 0.0
+            huvTime = 0.0
+            updateUTime = 0.0
+            propSpeedTime = 0.0
+            fullTime = fullPropSpeedsTimed(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 
-    # Calculate Fluxes and Source Terms
-    fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-    shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        # Calculate Fluxes and Source Terms
+        fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 
-    buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
-    # Calculate Timestep
-    dt = calculateTimestep(meshPropSpeedsGPU, cellWidth)
-    if saveOutput and time + dt > nextSave:
-        dt = nextSave - time
+        # Calculate Timestep
+        dt = calculateTimestep(meshPropSpeedsGPU, cellWidth)
+        if saveOutput and time + dt > nextSave:
+            dt = nextSave - time
 
-    # Build U* and apply boundary conditions
-    uStarTime = buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
-    # uStar = meshUstarGPU.get()
-    # print "Before"
-    # print3DMatrix(uStar, m, n, 2, "uStar")
-    bcTimeStar = applyWallBoundariesTimed(meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    # uStar = meshUstarGPU.get()
-    # print "After"
-    # print3DMatrix(uStar, m, n, 2, "uStar")
+        # Build U* and apply boundary conditions
+        uStarTime = buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUstarGPU.get()
+        # print "Before"
+        # print3DMatrix(uStar, m, n, 2, "uStar")
+        bcTimeStar = applyWallBoundariesTimed(meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUstarGPU.get()
+        # print "After"
+        # print3DMatrix(uStar, m, n, 2, "uStar")
 
-    # Reconstruct free surface
-    if (test == False):
-        freeSurfaceTimeStar = reconstructFreeSurfaceTimed(meshUstarGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-        positivityTimeStar = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-        huvTimeStar = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-        updateUstarTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-        propSpeedStarTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-        fullTimeStar = 0.0
-    else:
-        freeSurfaceTimeStar = 0.0
-        positivityTimeStar = 0.0
-        huvTimeStar = 0.0
-        updateUstarTime = 0.0
-        propSpeedStarTime = 0.0
-        fullTimeStar = fullPropSpeedsTimed(meshUstarGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        # Reconstruct free surface
+        if (test == False):
+            freeSurfaceTimeStar = reconstructFreeSurfaceTimed(meshUstarGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+            positivityTimeStar = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+            huvTimeStar = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+            updateUstarTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+            propSpeedStarTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+            fullTimeStar = 0.0
+        else:
+            freeSurfaceTimeStar = 0.0
+            positivityTimeStar = 0.0
+            huvTimeStar = 0.0
+            updateUstarTime = 0.0
+            propSpeedStarTime = 0.0
+            fullTimeStar = fullPropSpeedsTimed(meshUstarGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 
-    # Calculate Fluxes and Source Terms
-    fluxStarTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    slopeSourceStarTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-    shearSourceStarTime = solveBedShearTimed(meshShearSourceGPU, meshUstarGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-    buildRStarTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        # Calculate Fluxes and Source Terms
+        fluxStarTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        slopeSourceStarTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        shearSourceStarTime = solveBedShearTimed(meshShearSourceGPU, meshUstarGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        buildRStarTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
-    # Build Unext and apply boundary conditions
-    buildUnextTime = buildUnextTimed(meshUGPU, meshUGPU, meshUstarGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
-    # uStar = meshUGPU.get()
-    # print "Before"
-    # print3DMatrix(uStar, m, n, 2, "U")
-    bcTime = applyWallBoundariesTimed(meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-    # uStar = meshUGPU.get()
-    # print "After"
-    # print3DMatrix(uStar, m, n, 2, "U")
+        # Build Unext and apply boundary conditions
+        buildUnextTime = buildUnextTimed(meshUGPU, meshUGPU, meshUstarGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUGPU.get()
+        # print "Before"
+        # print3DMatrix(uStar, m, n, 2, "U")
+        bcTime = applyWallBoundariesTimed(meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUGPU.get()
+        # print "After"
+        # print3DMatrix(uStar, m, n, 2, "U")
 
-    timestepTime = (freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime +
-                   uStarTime + bcTimeStar + freeSurfaceTimeStar + positivityTimeStar + huvTimeStar + updateUstarTime + propSpeedStarTime + fluxStarTime + slopeSourceStarTime +
-                   shearSourceStarTime + buildRStarTime + buildUnextTime + bcTime + fullTime + fullTimeStar)
+        timestepTime = (freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime +
+                       uStarTime + bcTimeStar + freeSurfaceTimeStar + positivityTimeStar + huvTimeStar + updateUstarTime + propSpeedStarTime + fluxStarTime + slopeSourceStarTime +
+                       shearSourceStarTime + buildRStarTime + buildUnextTime + bcTime + fullTime + fullTimeStar)
 
-    simTime += timestepTime
+        simTime += timestepTime
 
-    # print "Total timestep calculation time: " + str(timestepTime) + " sec"
-    time += dt
-    iterations += 1
+        # print "Total timestep calculation time: " + str(timestepTime) + " sec"
+        time += dt
+        iterations += 1
 
-if saveOutput:
-    closeCustomFort63(workingDir, fort63, meshU, savedTimesteps)
-    print "Finished. " + str(savedTimesteps) + " timesteps saved."
-print "Total simulation time: " + str(simTime) + " seconds"
+    if saveOutput:
+        closeCustomFort63(workingDir, fort63, meshU, savedTimesteps)
+        print "Finished. " + str(savedTimesteps) + " timesteps saved."
+    print "Total simulation time: " + str(simTime) + " seconds\tTotal time: " + str(timer.time() - sTime)
 
-# freeSurfaceTime = reconstructFreeSurfaceTimed(meshUGPU, meshUIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-# positivityTime = preservePositivityTimed(meshUIntPtsGPU, meshBottomIntPtsGPU, meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-# huvTime = calculateHUVTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-# updateUTime = updateUIntPtsTimed(meshHUVIntPtsGPU, meshUIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-# propSpeedTime = calculatePropSpeedsTimed(meshPropSpeedsGPU, meshHUVIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-# fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-# slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-# shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-# buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
-# timestep = calculateTimestep(meshPropSpeedsGPU, cellWidth)
-# print "Timestep: " + str(timestep)
-# uStarTime = buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, timestep, m, n, [blockDim, blockDim], [gridN, gridM])
+else:
 
-# meshUIntPts = meshUIntPtsGPU.get()
-# huvIntPts = meshHUVIntPtsGPU.get()
-# propSpeeds = meshPropSpeedsGPU.get()
-# fluxes = meshFluxesGPU.get()
-# slopeSource = meshSlopeSourceGPU.get()
-# shearSource = meshShearSourceGPU.get()
-# RValues = meshRValuesGPU.get()
+    sTime = timer.time()
+    # Start Timestepping
+    while time < runTime:
 
+        if saveOutput and time == nextSave:
+            meshU = meshUGPU.get()
+            writeCustomTimestep(fort63, meshU)
+            savedTimesteps += 1
+            nextSave += saveTimestepInterval
 
-# print "Time to reconstruct free-surface:\t" + str(freeSurfaceTime) + " sec"
-# print "Time to preserve positivity:\t\t" + str(positivityTime) + " sec"
-# print "Time to calculate huv:\t\t\t" + str(huvTime) + " sec"
-# print "Time to update U at integration points:\t" + str(updateUTime) + " sec"
-# print "Time to calculate propagation speeds:\t" + str(propSpeedTime) + " sec"
-# print "Time to calculate fluxes:\t\t" + str(fluxTime) + " sec"
-# print "Time to calculate slope source:\t\t" + str(slopeSourceTime) + " sec"
-# print "Time to calculate shear source:\t\t" + str(shearSourceTime) + " sec"
-# print "Time to build R-values:\t\t\t" + str(buildRTime) + " sec"
-# print "Time to build Unext:\t\t\t" + str(uStarTime) + " sec"
-# print "\nTotal time:\t" + str(freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime + uStarTime)
+        # Reconstruct free surface
+        fullTime = fullPropSpeeds(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
 
-# direction = 2
-# printCellCenteredMatrix(meshU, m, n, 'meshU')
-# print2DirectionInterfaceMatrix(meshBottomIntPts, m, n, direction, 'meshBottomIntPts')
-# print4DirectionCellMatrix(meshUIntPts, m, n, direction, 'meshUIntPts', 0)
-# print4DirectionCellMatrix(huvIntPts, m, n, direction, "huvIntPts", 0)
-# print4DirectionCellMatrix(propSpeeds, m, n, 2, "propSpeeds")
-# print4DirectionCellMatrix(fluxes, m, n, 1, "fluxes", 1)
-# print3DMatrix(slopeSource, m, n, 0, "slopeSource")
-# printCellCenteredMatrix(shearSource, m, n, "shearSource")
-# printCellCenteredMatrix(RValues, m, n, "RValues", 1)
+        # Calculate Fluxes and Source Terms
+        fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+
+        buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+
+        # Calculate Timestep
+        dt = calculateTimestep(meshPropSpeedsGPU, cellWidth)
+        if saveOutput and time + dt > nextSave:
+            dt = nextSave - time
+
+        # Build U* and apply boundary conditions
+        buildUstarTimed(meshUstarGPU, meshUGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUstarGPU.get()
+        # print "Before"
+        # print3DMatrix(uStar, m, n, 2, "uStar")
+        applyWallBoundariesTimed(meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUstarGPU.get()
+        # print "After"
+        # print3DMatrix(uStar, m, n, 2, "uStar")
+
+        # Reconstruct free surface
+        fullPropSpeedsTimed(meshUstarGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, meshHUVIntPtsGPU, meshPropSpeedsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+
+        # Calculate Fluxes and Source Terms
+        fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        solveBedShearTimed(meshShearSourceGPU, meshUstarGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+
+        # Build Unext and apply boundary conditions
+        buildUnextTimed(meshUGPU, meshUGPU, meshUstarGPU, meshRValuesGPU, meshShearSourceGPU, dt, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUGPU.get()
+        # print "Before"
+        # print3DMatrix(uStar, m, n, 2, "U")
+        applyWallBoundariesTimed(meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        # uStar = meshUGPU.get()
+        # print "After"
+        # print3DMatrix(uStar, m, n, 2, "U")
+
+        # print "Total timestep calculation time: " + str(timestepTime) + " sec"
+        time += dt
+        iterations += 1
+
+    if saveOutput:
+        closeCustomFort63(workingDir, fort63, meshU, savedTimesteps)
+        print "Finished. " + str(savedTimesteps) + " timesteps saved."
+    print "Time to finish: " + str(timer.time() - sTime)
 

@@ -405,6 +405,12 @@ updateUIntPtsGPU = spacialModule.get_function("updateUIntPts")
 calculatePropagationSpeedsGPU = spacialModule.get_function("calculatePropagationSpeeds")
 FullPropSpeeds = spacialModule.get_function("FullPropSpeeds")
 
+def fullPropSpeeds(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, huvIntPtsGPU, propSpeeds, m, n, dx, dy, blockDims, gridDims):
+
+    FullPropSpeeds(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, huvIntPtsGPU, propSpeeds,
+                   np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
+                   block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]),)
+
 def fullPropSpeedsTimed(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, huvIntPtsGPU, propSpeeds, m, n, dx, dy, blockDims, gridDims):
 
     return FullPropSpeeds(meshUGPU, meshBottomIntPtsGPU, meshUIntPtsGPU, huvIntPtsGPU, propSpeeds,
