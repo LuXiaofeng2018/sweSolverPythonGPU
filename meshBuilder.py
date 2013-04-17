@@ -6,6 +6,47 @@ Created on Apr 15, 2013
 
 import numpy as np
 
+# Builds a beach mesh, sloping up from left to right, with a water pyramid initial condition
+# m = number of rows, including padding cells
+# n = number of columns, including padding cells
+#
+# Returns:
+# - meshU
+# - meshCoordinates
+# - meshBottomIntPts
+# - dx, dy
+def buildBeachTestMesh(m, n):
+
+    meshCoordinates = np.zeros((m + 1, n + 1, 3))  # Because each cell holds bottom left point, need extra row and column to fully define mxn size grid
+    meshBottomIntPts = np.zeros((m + 1, n + 1, 2))  # Each cell holds z-value at bottom (0) and left (1) int. pts, so need extra row/column to fully define grid
+
+    dx = 10.0  # 10-meter cell width
+    dy = 10.0  # 10-meter cell height
+    slope = 0.01  # Beach will climb 0.1 meters every cell
+
+    for i in range(m + 1):
+        for j in range(n + 1):
+            # x-coordinate
+            meshCoordinates[i][j][0] = j * dx
+            # y-coordinate
+            meshCoordinates[i][j][1] = i * dy
+            # z-coordinate
+            meshCoordinates[i][j][2] = slope * j * dx
+
+    for i in range(m + 1):
+        for j in range(n + 1):
+            # Bottom integration point elevation
+            meshBottomIntPts[i][j][0] = (meshCoordinates[i][j + 1][2] + meshCoordinates[i][j][2]) / 2.0
+            # Left integration point elevation
+            meshBottomIntPts[i][j][1] = (meshCoordinates[i + 1][j][2] + meshCoordinates[i][j][2]) / 2.0
+
+
+
+##################################################################################
+##################################################################################
+################ Old stuff starts here ###########################################
+##################################################################################
+##################################################################################
 
 # Builds a square test mesh
 def buildTestMesh(gridSize, gridPadding, cellWidth, cellHeight, floorElevation):
@@ -85,7 +126,7 @@ def buildDoubleSlopingTestMesh(gridSize, gridPadding, cellWidth, cellHeight, low
     meshBottomCenters = np.zeros((m, n))
     for i in range(m):
         for j in range(n):
-            meshBottomCenters[i][j] = (meshBottomIntegrationPoints[i + 1][j][1] - meshBottomIntegrationPoints[i][j][1]) / 2.0  # z
+            meshBottomCenters[i][j] = meshBottomIntegrationPoints[i][j][1] + (meshBottomIntegrationPoints[i + 1][j][1] - meshBottomIntegrationPoints[i][j][1]) / 2.0  # z
 
 
     return meshCoordinates, meshBottomIntegrationPoints, meshBottomSlopes, meshBottomCenters
@@ -124,7 +165,7 @@ def buildSlopingTestMesh(gridSize, gridPadding, cellWidth, cellHeight, lowestEle
     meshBottomCenters = np.zeros((m, n))
     for i in range(m):
         for j in range(n):
-            meshBottomCenters[i][j] = (meshBottomIntegrationPoints[i + 1][j][1] - meshBottomIntegrationPoints[i][j][1]) / 2.0  # z
+            meshBottomCenters[i][j] = meshBottomIntegrationPoints[i][j][1] + (meshBottomIntegrationPoints[i][j + 1][1] - meshBottomIntegrationPoints[i][j][1]) / 2.0  # z
 
 
     return meshCoordinates, meshBottomIntegrationPoints, meshBottomSlopes, meshBottomCenters

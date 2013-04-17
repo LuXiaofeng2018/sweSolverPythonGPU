@@ -32,7 +32,7 @@ iterations = 0
 freeSurface = 0.0
 cellWidth = 1.0
 cellHeight = 1.0
-gridSize = 16
+gridSize = 32
 m = gridSize + 4
 n = gridSize + 4
 
@@ -42,7 +42,12 @@ gridM = m / blockDim + (1 if (m % blockDim != 0) else 0)
 gridN = n / blockDim + (1 if (n % blockDim != 0) else 0)
 
 meshCoordinates, meshBottomIntPts, meshBottomSlopes, meshBottomCenters = buildDoubleSlopingTestMesh(gridSize, 2, cellWidth, cellHeight, 1.0, 0.1, 12)
-meshU = buildPyramidTestU(meshCoordinates, meshBottomCenters, 5.0, 4.5, 5)
+meshU = buildPyramidTestU(meshCoordinates, meshBottomCenters, 5.0, 2.0, 5)
+
+# print3DMatrix(meshCoordinates, m, n, 2, "meshCoordinates")
+# printCellCenteredMatrix(meshBottomCenters, m, n, "meshbottomcenters")
+# print3DMatrix(meshU, m, n, 0, "meshU")
+# exit()
 
 # meshCoordinates = np.zeros((m + 1, n + 1, 3))
 # for i in range(m + 1):
