@@ -58,6 +58,32 @@ sourceModule = SourceModule("""
         }
         
     }
+    
+    // Wind shear matrix will only store 2 values because the third value is always 0
+    __global__ void windShearSourceSolver(float *meshWindShear, float *meshWindSpeeds, int m, int n)
+    {
+        int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
+        int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
+        
+        float Wc = 5.6f;
+        
+        if (col < n-1 && row < m-1)
+        {
+            float windSpeed = meshWindSpeeds[row*n*2 + col*2];    // Magnitude of wind speed
+            float theta = meshWindSpeeds[row*n*2 + col*2 + 1];    // Angle (in radians) from positive x-dir
+            
+            float k = 0.0f;
+            if (windSpeed <= Wc)
+            {
+                k = 0.0000012f;
+            } else {
+                k = 0.0000012f + 0.00000225f * powf(1.0f - (Wc / windSpeed), 2.0f)
+            }
+            
+            meshWindShear[row*n*2 + col*2] = k * powf(windSpeed, 2.0f) * cosf(theta);
+            meshWindShear[row*n*2 + col*2 + 1] = k * powf(windSpeed, 2.0f) * sinf(theta);
+        }
+    }
 
 """)
 
