@@ -43,6 +43,7 @@ sourceModule = SourceModule("""
         
         if (col < n-1 && row < m-1)
         {
+            // Very small values of h here could be cause instabilites in the bed shear source terms
             float h = meshU[row*n*3 + col*3] - (meshBottomIntPts[row*(n+1)*2 + (col+1)*2 + 1] + meshBottomIntPts[row*(n+1)*2 + col*2 + 1]) / 2.0f;
             if (h > 0.0f)
             {
@@ -60,7 +61,7 @@ sourceModule = SourceModule("""
     }
     
     // Wind shear matrix will only store 2 values because the third value is always 0
-    __global__ void windShearSourceSolver(float *meshWindShear, float *meshWindSpeeds, int m, int n)
+    __global__ void windShearSourceSolver(float *meshWindShear, float *meshWindSpeeds, float *meshU, float *meshBottomIntPts, int m, int n)
     {
         int row = blockIdx.y * blockDim.y + threadIdx.y + 1;
         int col = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -71,17 +72,24 @@ sourceModule = SourceModule("""
         {
             float windSpeed = meshWindSpeeds[row*n*2 + col*2];    // Magnitude of wind speed
             float theta = meshWindSpeeds[row*n*2 + col*2 + 1];    // Angle (in radians) from positive x-dir
+            float h = meshU[row*n*3 + col*3] - (meshBottomIntPts[row*(n+1)*2 + (col+1)*2 + 1] + meshBottomIntPts[row*(n+1)*2 + col*2 + 1]) / 2.0f; // Water surface elevation at center of cell
             
-            float k = 0.0f;
-            if (windSpeed <= Wc)
+            if (h > 0.0f)
             {
-                k = 0.0000012f;
+                float k = 0.0f;
+                if (windSpeed <= Wc)
+                {
+                    k = 0.0000012f;
+                } else {
+                    k = 0.0000012f + 0.00000225f * powf(1.0f - (Wc / windSpeed), 2.0f);
+                }
+                
+                meshWindShear[row*n*2 + col*2] = (k * powf(windSpeed, 2.0f) * cosf(theta)) / h;
+                meshWindShear[row*n*2 + col*2 + 1] = (k * powf(windSpeed, 2.0f) * sinf(theta)) / h;
             } else {
-                k = 0.0000012f + 0.00000225f * powf(1.0f - (Wc / windSpeed), 2.0f);
+                meshWindShear[row*n*2 + col*2] = 0.0f;
+                meshWindShear[row*n*2 + col*2 + 1] = 0.0f;
             }
-            
-            meshWindShear[row*n*2 + col*2] = k * powf(windSpeed, 2.0f) * cosf(theta);
-            meshWindShear[row*n*2 + col*2 + 1] = k * powf(windSpeed, 2.0f) * sinf(theta);
         }
     }
 
@@ -115,15 +123,15 @@ def solveBedShearTimed(meshBedShearGPU, meshUGPU, meshBottomIntPtsGPU, m, n, dx,
                                 np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
                                 block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
 
-def solveWindShear(meshWindShearGPU, meshWindSpeedsGPU, m, n, blockDims, gridDims):
+def solveWindShear(meshWindShearGPU, meshWindSpeedsGPU, meshUGPU, meshBottomIntPtsGPU, m, n, blockDims, gridDims):
 
-    windShearSourceSolver(meshWindShearGPU, meshWindSpeedsGPU,
+    windShearSourceSolver(meshWindShearGPU, meshWindSpeedsGPU, meshUGPU, meshBottomIntPtsGPU,
                           np.int32(m), np.int32(n),
                           block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
 
-def solveWindShearTimed(meshWindShearGPU, meshWindSpeedsGPU, m, n, blockDims, gridDims):
+def solveWindShearTimed(meshWindShearGPU, meshWindSpeedsGPU, meshUGPU, meshBottomIntPtsGPU, m, n, blockDims, gridDims):
 
-    return windShearSourceSolver(meshWindShearGPU, meshWindSpeedsGPU,
+    return windShearSourceSolver(meshWindShearGPU, meshWindSpeedsGPU, meshUGPU, meshBottomIntPtsGPU,
                                  np.int32(m), np.int32(n),
                                  block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
 

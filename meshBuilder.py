@@ -13,9 +13,9 @@ def buildBasinTestMesh(m, n):
     meshBottomIntPts = np.zeros((m + 1, n + 1, 2))  # Each cell holds z-value at bottom (0) and left (1) int. pts, so need extra row/column to fully define grid
     meshU = np.zeros((m, n, 3))
 
-    dx = 0.1  # 0.1-meter cell width
-    dy = 0.1  # 0.1-meter cell height
-    waterElevation = 2.0  # 10-meter water depth
+    dx = 1.0  # 0.1-meter cell width
+    dy = 1.0  # 0.1-meter cell height
+    waterElevation = 5.0  # 10-meter water depth
 
     for i in range(m + 1):
         for j in range(n + 1):

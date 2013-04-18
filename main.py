@@ -26,16 +26,16 @@ test = True
 timed = True
 time = 0.0
 dt = 0.0
-runTime = 100.0
-saveTimestepInterval = 0.1
+runTime = 500.0
+saveTimestepInterval = 0.5
 nextSave = 0.1
 simTime = 0.0
 iterations = 0
 savedTimesteps = 0
 
 # Build test mesh
-m = 32
-n = 32
+m = 64
+n = 64
 # meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBeachTestMesh(m, n)
 meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBasinTestMesh(m, n)
 
@@ -43,7 +43,8 @@ meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBasinTest
 meshWind = np.zeros((m, n, 2))
 for i in range(m):
     for j in range(n):
-        meshWind[i][j][0] = 250.0
+        meshWind[i][j][0] = 100.0
+        # meshWind[i][j][1] = 0.785398163
 
 
 # Calculate GPU grid/block sizes
@@ -145,9 +146,7 @@ if timed:
         fluxTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
         slopeSourceTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
         shearSourceTime = solveBedShearTimed(meshShearSourceGPU, meshUGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
-
-        # Wind source only needs to be calculated once per timestep because it is not dependent on U
-        windSourceTime = solveWindShearTimed(meshWindShearGPU, meshWindGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        windSourceTime = solveWindShearTimed(meshWindShearGPU, meshWindGPU, meshUGPU, meshBottomIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
         buildRTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, meshWindShearGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
@@ -186,6 +185,7 @@ if timed:
         fluxStarTime = fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshPropSpeedsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
         slopeSourceStarTime = solveBedSlopeTimed(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
         shearSourceStarTime = solveBedShearTimed(meshShearSourceGPU, meshUstarGPU, meshBottomIntPtsGPU, m, n, cellWidth, cellHeight, [blockDim, blockDim], [gridN, gridM])
+        windSourceStarTime = solveWindShearTimed(meshWindShearGPU, meshWindGPU, meshUstarGPU, meshBottomIntPtsGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
         buildRStarTime = buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, meshWindShearGPU, m, n, [blockDim, blockDim], [gridN, gridM])
 
@@ -201,11 +201,13 @@ if timed:
 
         timestepTime = (freeSurfaceTime + positivityTime + huvTime + updateUTime + propSpeedTime + fluxTime + slopeSourceTime + shearSourceTime + buildRTime +
                        uStarTime + bcTimeStar + freeSurfaceTimeStar + positivityTimeStar + huvTimeStar + updateUstarTime + propSpeedStarTime + fluxStarTime + slopeSourceStarTime +
-                       shearSourceStarTime + buildRStarTime + buildUnextTime + bcTime + fullTime + fullTimeStar + windSourceTime)
+                       shearSourceStarTime + buildRStarTime + buildUnextTime + bcTime + fullTime + fullTimeStar + windSourceTime + windSourceStarTime)
 
         simTime += timestepTime
 
         # print "Total timestep calculation time: " + str(timestepTime) + " sec"
+        if (iterations % 100 == 0):
+            print "Iteration: " + str(iterations) + "\tTime: " + str(time) + "\tdt: " + str(dt)
         time += dt
         iterations += 1
 
@@ -278,5 +280,3 @@ else:
         closeCustomFort63(workingDir, fort63, meshU, savedTimesteps)
         print "Finished. " + str(savedTimesteps) + " timesteps saved."
     print "Time to finish: " + str(timer.time() - sTime)
-
-plotTimeHistory(800, workingDir + "/fort.63g")
