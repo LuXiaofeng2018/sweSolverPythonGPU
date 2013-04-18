@@ -26,16 +26,16 @@ test = True
 timed = True
 time = 0.0
 dt = 0.0
-runTime = 500.0
-saveTimestepInterval = 0.5
-nextSave = 0.1
+runTime = 3600.0
+saveTimestepInterval = 1.0
+nextSave = 0.0
 simTime = 0.0
 iterations = 0
 savedTimesteps = 0
 
 # Build test mesh
-m = 64
-n = 64
+m = 128
+n = 128
 # meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBeachTestMesh(m, n)
 meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBasinTestMesh(m, n)
 
@@ -43,7 +43,7 @@ meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBasinTest
 meshWind = np.zeros((m, n, 2))
 for i in range(m):
     for j in range(n):
-        meshWind[i][j][0] = 100.0
+        meshWind[i][j][0] = 5.0
         # meshWind[i][j][1] = 0.785398163
 
 
@@ -206,7 +206,7 @@ if timed:
         simTime += timestepTime
 
         # print "Total timestep calculation time: " + str(timestepTime) + " sec"
-        if (iterations % 100 == 0):
+        if (iterations % 1000 == 0):
             print "Iteration: " + str(iterations) + "\tTime: " + str(time) + "\tdt: " + str(dt)
         time += dt
         iterations += 1
