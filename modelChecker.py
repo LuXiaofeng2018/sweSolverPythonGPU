@@ -4,6 +4,7 @@ Created on Apr 7, 2013
 @author: tristan
 '''
 
+import matplotlib.pyplot as plt
 
 def printCellCenteredMatrix(matrix, m, n, matrixName, index= -1):
 
@@ -84,3 +85,51 @@ def getDirectionText(direction):
         2 : 'East' ,
         3 : 'West'
         }.get(direction, 'Oops')
+
+def plotTimeHistory(elementNum, fort63Loc):
+
+    fort63 = open(fort63Loc, "r")
+
+    fort63.readline()
+    datLine = fort63.readline().split()
+    numTS = int(datLine[0])
+    numElements = int(datLine[1])
+    fullDat = fort63.read().split()
+    fort63.close()
+
+    xVals = [i for i in range(numTS)]
+    yVals = [float(fullDat[i * 2 * (numElements + 1) + 2 * elementNum + 1]) for i in range(numTS)]
+
+    plt.plot(xVals, yVals)
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

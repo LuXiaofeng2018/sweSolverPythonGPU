@@ -279,3 +279,4 @@ else:
         print "Finished. " + str(savedTimesteps) + " timesteps saved."
     print "Time to finish: " + str(timer.time() - sTime)
 
+plotTimeHistory(800, workingDir + "/fort.63g")
