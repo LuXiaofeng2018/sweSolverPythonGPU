@@ -77,7 +77,7 @@ sourceModule = SourceModule("""
             {
                 k = 0.0000012f;
             } else {
-                k = 0.0000012f + 0.00000225f * powf(1.0f - (Wc / windSpeed), 2.0f)
+                k = 0.0000012f + 0.00000225f * powf(1.0f - (Wc / windSpeed), 2.0f);
             }
             
             meshWindShear[row*n*2 + col*2] = k * powf(windSpeed, 2.0f) * cosf(theta);
@@ -89,6 +89,7 @@ sourceModule = SourceModule("""
 
 bedSlopeSourceSolver = sourceModule.get_function("bedSlopeSourceSolver")
 bedShearSourceSolver = sourceModule.get_function("bedShearSourceSolver")
+windShearSourceSolver = sourceModule.get_function("windShearSourceSolver")
 
 def solveBedSlope(meshSlopeSourceGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, m, n, dx, dy, blockDims, gridDims):
 
@@ -113,4 +114,16 @@ def solveBedShearTimed(meshBedShearGPU, meshUGPU, meshBottomIntPtsGPU, m, n, dx,
     return bedShearSourceSolver(meshBedShearGPU, meshUGPU, meshBottomIntPtsGPU,
                                 np.int32(m), np.int32(n), np.float32(dx), np.float32(dy),
                                 block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
+
+def solveWindShear(meshWindShearGPU, meshWindSpeedsGPU, m, n, blockDims, gridDims):
+
+    windShearSourceSolver(meshWindShearGPU, meshWindSpeedsGPU,
+                          np.int32(m), np.int32(n),
+                          block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
+
+def solveWindShearTimed(meshWindShearGPU, meshWindSpeedsGPU, m, n, blockDims, gridDims):
+
+    return windShearSourceSolver(meshWindShearGPU, meshWindSpeedsGPU,
+                                 np.int32(m), np.int32(n),
+                                 block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
 

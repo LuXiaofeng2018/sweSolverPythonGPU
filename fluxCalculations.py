@@ -101,7 +101,7 @@ fluxModule = SourceModule("""
         }
     }
     
-    __global__ void buildRValues(float *meshRValues, float *meshFluxes, float *meshSlopeSource, int m, int n)
+    __global__ void buildRValues(float *meshRValues, float *meshFluxes, float *meshSlopeSource, float *meshWindShear, int m, int n)
     {
         int row = blockIdx.y * blockDim.y + threadIdx.y + 2;
         int col = blockIdx.x * blockDim.x + threadIdx.x + 2;
@@ -109,8 +109,8 @@ fluxModule = SourceModule("""
         if (col < n-2 && row < m-2)
         {
             meshRValues[row*n*3 + col*3] = 0.0f - (meshFluxes[row*n*2*3 + col*2*3 + 3] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 3]) - (meshFluxes[row*n*2*3 + col*2*3] - meshFluxes[(row-1)*n*2*3 + col*2*3]);
-            meshRValues[row*n*3 + col*3 + 1] = meshSlopeSource[row*n*2 + col*2] - (meshFluxes[row*n*2*3 + col*2*3 + 4] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 4]) - (meshFluxes[row*n*2*3 + col*2*3 + 1] - meshFluxes[(row-1)*n*2*3 + col*2*3 + 1]);
-            meshRValues[row*n*3 + col*3 + 2] = meshSlopeSource[row*n*2 + col*2 + 1] - (meshFluxes[row*n*2*3 + col*2*3 + 5] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 5]) - (meshFluxes[row*n*2*3 + col*2*3 + 2] - meshFluxes[(row-1)*n*2*3 + col*2*3 + 2]);
+            meshRValues[row*n*3 + col*3 + 1] = meshWindShear[row*n*2 + col*2] + meshSlopeSource[row*n*2 + col*2] - (meshFluxes[row*n*2*3 + col*2*3 + 4] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 4]) - (meshFluxes[row*n*2*3 + col*2*3 + 1] - meshFluxes[(row-1)*n*2*3 + col*2*3 + 1]);
+            meshRValues[row*n*3 + col*3 + 2] = meshWindShear[row*n*2 + col*2 + 1] + meshSlopeSource[row*n*2 + col*2 + 1] - (meshFluxes[row*n*2*3 + col*2*3 + 5] - meshFluxes[row*n*2*3 + (col-1)*2*3 + 5]) - (meshFluxes[row*n*2*3 + col*2*3 + 2] - meshFluxes[(row-1)*n*2*3 + col*2*3 + 2]);
         }
     }
 
@@ -132,14 +132,14 @@ def fluxSolverTimed(meshFluxesGPU, meshUIntPtsGPU, meshBottomIntPtsGPU, meshProp
                   np.int32(m), np.int32(n),
                   block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
 
-def buildRValues(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, blockDims, gridDims):
+def buildRValues(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, meshWindShearGPU, m, n, blockDims, gridDims):
 
-    buildRValuesGPU(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU,
+    buildRValuesGPU(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, meshWindShearGPU,
                     np.int32(m), np.int32(n),
                     block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]))
 
-def buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, m, n, blockDims, gridDims):
+def buildRValuesTimed(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, meshWindShearGPU, m, n, blockDims, gridDims):
 
-    return buildRValuesGPU(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU,
+    return buildRValuesGPU(meshRValuesGPU, meshFluxesGPU, meshSlopeSourceGPU, meshWindShearGPU,
                     np.int32(m), np.int32(n),
                     block=(blockDims[0], blockDims[1], 1), grid=(gridDims[0], gridDims[1]), time_kernel=True)
