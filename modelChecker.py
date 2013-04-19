@@ -94,11 +94,22 @@ def plotTimeHistory(elementNum, fort63Loc):
     datLine = fort63.readline().split()
     numTS = int(datLine[0])
     numElements = int(datLine[1])
-    fullDat = fort63.read().split()
+
+    yVals = []
+
+    l = 0
+    currTS = 0
+    nextTS = currTS * (numElements + 1) + elementNum + 1
+    for line in fort63:
+        if l == nextTS:
+            yVals.append(float(line.split()[1]))
+            currTS += 1
+            nextTS = currTS * (numElements + 1) + elementNum + 1
+        l += 1
+
     fort63.close()
 
     xVals = [i for i in range(numTS)]
-    yVals = [float(fullDat[i * 2 * (numElements + 1) + 2 * elementNum + 1]) for i in range(numTS)]
 
     plt.plot(xVals, yVals)
     plt.show()
