@@ -47,7 +47,7 @@ def buildBasinTestMesh(m, n):
             meshU[i][j][2] = 0.0
 
     # Add the water pyramid to the water surface
-    # meshU = buildPyramid(meshU, n / 4, m / 2, 10, 0.1)
+    meshU = buildPyramid(meshU, n / 4, m / 2, 10, 0.1)
 
     return meshU, meshCoordinates, meshBottomIntPts, dx, dy
 

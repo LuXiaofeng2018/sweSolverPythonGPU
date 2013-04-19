@@ -26,8 +26,8 @@ test = True
 timed = True
 time = 0.0
 dt = 0.0
-runTime = 3600.0
-saveTimestepInterval = 1.0
+runTime = 100.0
+saveTimestepInterval = 0.1
 nextSave = 0.0
 simTime = 0.0
 iterations = 0
@@ -43,7 +43,7 @@ meshU, meshCoordinates, meshBottomIntPts, cellWidth, cellHeight = buildBasinTest
 meshWind = np.zeros((m, n, 2))
 for i in range(m):
     for j in range(n):
-        meshWind[i][j][0] = 5.0
+        meshWind[i][j][0] = 0.0
         # meshWind[i][j][1] = 0.785398163
 
 
@@ -160,7 +160,7 @@ if timed:
         # uStar = meshUstarGPU.get()
         # print "Before"
         # print3DMatrix(uStar, m, n, 2, "uStar")
-        bcTimeStar = applyWallBoundariesTimed(meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        bcTimeStar = applyOpenBoundariesTimed(meshUstarGPU, m, n, [blockDim, blockDim], [gridN, gridM])
         # uStar = meshUstarGPU.get()
         # print "After"
         # print3DMatrix(uStar, m, n, 2, "uStar")
@@ -194,7 +194,7 @@ if timed:
         # uStar = meshUGPU.get()
         # print "Before"
         # print3DMatrix(uStar, m, n, 2, "U")
-        bcTime = applyWallBoundariesTimed(meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
+        bcTime = applyOpenBoundariesTimed(meshUGPU, m, n, [blockDim, blockDim], [gridN, gridM])
         # uStar = meshUGPU.get()
         # print "After"
         # print3DMatrix(uStar, m, n, 2, "U")
